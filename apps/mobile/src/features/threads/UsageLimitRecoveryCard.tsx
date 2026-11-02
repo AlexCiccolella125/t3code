@@ -2,6 +2,7 @@ import { Button } from "../../components/ui/Button";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import { limitRecoveryOwnsSnooze } from "@t3tools/client-runtime/state/thread-execution";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
@@ -9,7 +10,6 @@ import {
   CHATGPT_WORKSPACE_ADMIN_REQUEST,
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
 } from "@t3tools/shared/usageLimits";
-import * as DateTime from "effect/DateTime";
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
 import { Linking, Pressable, View } from "react-native";
@@ -52,15 +52,17 @@ export function UsageLimitRecoveryCard({
   )
     return null;
   const resetText = resetAt
-    ? `Usage limit resets ${DateTime.toDateUtc(DateTime.makeUnsafe(resetAt)).toLocaleString()}.`
+    ? `${canSchedule && scheduled ? "Resumes" : "Resets"} ${new Date(resetAt).toLocaleString(
+        undefined,
+        { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" },
+      )}.`
     : null;
-  const snoozed =
-    recovery?.snooze === true &&
-    recovery.runId === runId &&
-    recovery.resetAt === resetAt &&
-    resetAt !== null &&
-    thread.snoozedUntil !== null &&
-    Date.parse(thread.snoozedUntil) === Date.parse(resetAt);
+  const snoozed = limitRecoveryOwnsSnooze({
+    runId,
+    resetAt,
+    recovery,
+    snoozedUntil: thread.snoozedUntil,
+  });
   async function toggle(action: "resume" | "snooze") {
     if (!resetAt || !runId || !canSchedule) return;
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
@@ -149,8 +151,9 @@ export function UsageLimitRecoveryCard({
           </View>
         ) : (
           <Text className="text-sm text-warning-foreground">
-            {resetText ??
-              "The provider did not report a reset time. Retry manually when your limit is available."}
+            {resetText
+              ? `Usage limit reached. ${resetText}`
+              : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
           </Text>
         )}
         {canSchedule ? (
