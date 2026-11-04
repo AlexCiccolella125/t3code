@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 export const SpeechModelId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160));
@@ -92,6 +93,7 @@ export const EnvironmentSpeechStatus = Schema.Union([
     model: Schema.String,
     size: Schema.Finite,
     supportsStreaming: Schema.Boolean,
+    supportsBufferedStreaming: Schema.optionalKey(Schema.Boolean),
     supportsTranslation: Schema.Boolean,
     languages: Schema.optionalKey(Schema.Array(Schema.String)),
     supportsLanguageDetection: Schema.optionalKey(Schema.Boolean),
@@ -117,12 +119,18 @@ export const SpeechPostProcessingPromptSettings = Schema.Struct({
 });
 export type SpeechPostProcessingPromptSettings = typeof SpeechPostProcessingPromptSettings.Type;
 
+/** A word the person says to flag a spoken correction, such as "sorry" or "err". */
+export const SpeechCorrectionCue = Schema.String.check(Schema.isMaxLength(50));
+
 /** Recognition preferences that travel with every recording. */
 export const SpeechTranscriptionOptions = Schema.Struct({
   speechLanguage: SpeechLanguage,
   speechTranslateToEnglish: Schema.Boolean,
   speechCustomWords: SpeechCustomWords,
   speechRemoveFillerWords: Schema.Boolean,
+  /** Preserve this cue for separately consented transcript cleanup. */
+  speechCorrectionWord: Schema.optionalKey(SpeechCorrectionCue),
+  speechSilenceFiltering: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
 });
 export type SpeechTranscriptionOptions = typeof SpeechTranscriptionOptions.Type;
 export const DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS: SpeechTranscriptionOptions = {
@@ -130,11 +138,9 @@ export const DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS: SpeechTranscriptionOptions = 
   speechTranslateToEnglish: false,
   speechCustomWords: [],
   speechRemoveFillerWords: true,
+  speechSilenceFiltering: true,
 };
 export const SPEECH_MAX_OPTIONS_BYTES = 128_000;
-
-/** A word the person says to flag a spoken correction, such as "sorry" or "err". */
-export const SpeechCorrectionCue = Schema.String.check(Schema.isMaxLength(50));
 
 export const SpeechPostProcessingOptions = Schema.Struct({
   speechCustomWords: SpeechCustomWords,

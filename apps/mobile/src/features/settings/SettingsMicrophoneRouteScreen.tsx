@@ -32,6 +32,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
 import { SettingsDragHandle } from "./components/SettingsDragHandle";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 import {
   deviceMicrophoneOrder,
@@ -205,7 +206,7 @@ export function SettingsMicrophoneRouteScreen() {
   const dragTo = drag === null ? -1 : dragFrom + dropSteps(dragFrom, drag.translation);
 
   return (
-    <View collapsable={false} className="flex-1 bg-sheet">
+    <SettingsScreen title="Microphone">
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -307,7 +308,7 @@ export function SettingsMicrophoneRouteScreen() {
             : null}
         </Text>
       </ScrollView>
-    </View>
+    </SettingsScreen>
   );
 }
 

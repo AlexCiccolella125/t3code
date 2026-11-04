@@ -30,6 +30,7 @@ import {
   type SpeechModel,
 } from "./model.ts";
 import { listNativeSpeechGpuDevices, loadNativeSpeechModel } from "./native.ts";
+import { SILERO_VAD } from "./silero.ts";
 import { isSpeechPlatformSupported } from "./platform.ts";
 import * as SpeechModelStore from "./SpeechModelStore.ts";
 
@@ -37,14 +38,13 @@ const SAMPLE_RATE = 16_000;
 const MAX_SPEECH_DURATION_SECONDS = 5 * 60;
 export const MAX_SPEECH_BYTES =
   SAMPLE_RATE * Float32Array.BYTES_PER_ELEMENT * MAX_SPEECH_DURATION_SECONDS;
-const MIN_CAPTURE_RMS = 0.0005;
 
 export class SpeechInvalidAudioError extends Schema.TaggedError<SpeechInvalidAudioError>()(
   "SpeechInvalidAudioError",
   { byteLength: Schema.Number, message: Schema.String },
 ) {}
 
-export function decodeSpeechPcm(pcmBytes: Uint8Array, preserveSilence = false): Float32Array {
+export function decodeSpeechPcm(pcmBytes: Uint8Array): Float32Array {
   if (
     pcmBytes.byteLength === 0 ||
     pcmBytes.byteLength > MAX_SPEECH_BYTES ||
@@ -58,7 +58,6 @@ export function decodeSpeechPcm(pcmBytes: Uint8Array, preserveSilence = false): 
   // WebSocket frames can be pooled Node Buffers whose backing storage is larger
   // than the frame. Copy the view so only the received bytes are decoded.
   const pcm = new Float32Array(Uint8Array.from(pcmBytes).buffer);
-  let energy = 0;
   for (const sample of pcm) {
     if (!Number.isFinite(sample) || sample < -1 || sample > 1) {
       throw new SpeechInvalidAudioError({
@@ -66,11 +65,8 @@ export function decodeSpeechPcm(pcmBytes: Uint8Array, preserveSilence = false): 
         message: "audio contains an invalid PCM sample",
       });
     }
-    energy += sample * sample;
   }
-  return !preserveSilence && Math.sqrt(energy / pcm.length) < MIN_CAPTURE_RMS
-    ? new Float32Array()
-    : pcm;
+  return pcm;
 }
 
 export class SpeechOperationError extends Schema.TaggedError<SpeechOperationError>()(
@@ -277,6 +273,21 @@ const make = Effect.gen(function* () {
   const selectedModel = (settings: SettingsSnapshot): SpeechModel =>
     getSpeechModel(settings.speechModelId) ?? getSpeechModel(DEFAULT_SPEECH_MODEL_ID)!;
 
+  const acquireSilenceModel = Effect.fn("SpeechService.acquireSilenceModel")((
+    purpose: "installation" | "recording",
+  ) => {
+    const acquisition = store.download(SILERO_VAD);
+    return (
+      purpose === "recording" ? acquisition.pipe(Effect.timeout("15 seconds")) : acquisition
+    ).pipe(
+      Effect.catch(() =>
+        Effect.logWarning("Silero unavailable; using raw audio with bounded ASR processing.").pipe(
+          Effect.as(undefined),
+        ),
+      ),
+    );
+  });
+
   // The transfer runs in the service scope, so a dropped request keeps it going and
   // a later request for the same model joins it; cancelDownload interrupts it.
   const download = Effect.fn("SpeechService.download")(function* (modelId: string) {
@@ -298,6 +309,9 @@ const make = Effect.gen(function* () {
           },
         })
         .pipe(
+          (modelDownload) =>
+            Effect.all([modelDownload, acquireSilenceModel("installation")], { concurrency: 2 }),
+          Effect.map(([modelPath]) => modelPath),
           Effect.mapError((cause) => speechError("model download", cause)),
           Effect.ensuring(
             Effect.sync(() => {
@@ -428,6 +442,7 @@ const make = Effect.gen(function* () {
       model: definition.name,
       size: definition.size,
       supportsStreaming: definition.supportsStreaming,
+      supportsBufferedStreaming: true,
       supportsTranslation: definition.supportsTranslation,
       languages: definition.languages,
       supportsLanguageDetection: definition.supportsLanguageDetection,
@@ -494,7 +509,9 @@ const make = Effect.gen(function* () {
     language: string | undefined,
   ) => {
     return (
-      options.speechRemoveFillerWords ? removeSpeechFillerWords(text, language) : text
+      options.speechRemoveFillerWords
+        ? removeSpeechFillerWords(text, language, options.speechCorrectionWord)
+        : text
     ).trim();
   };
 
@@ -523,6 +540,15 @@ const make = Effect.gen(function* () {
       ),
     ),
   );
+
+  const silenceModelPath = Effect.fn("SpeechService.silenceModelPath")(function* (
+    loaded: LoadedModel,
+    options: SpeechTranscriptionOptions,
+  ) {
+    if (!options.speechSilenceFiltering && (loaded.supportsStreaming || loaded.supportsLongForm))
+      return undefined;
+    return yield* acquireSilenceModel("recording");
+  });
 
   const transcribe: SpeechService["Service"]["transcribe"] = Effect.fn("SpeechService.transcribe")(
     function* (pcmBytes, options) {
@@ -555,28 +581,30 @@ const make = Effect.gen(function* () {
                 ),
               catch: (cause) => speechError("model preparation", cause),
             });
+            const vadPath = yield* silenceModelPath(loaded, options);
             const dictionary = normalizeSpeechCustomWords(options.speechCustomWords);
             const customWords = dictionary.map(({ term }) => term);
+            // The vocabulary capability guarantees plain transcription, not translation.
+            const vocabularyFor = (inference: LoadedModel) =>
+              inference.supportsVocabulary && !translateToEnglish ? customWords : [];
             const transcribeWith = (inference: LoadedModel) =>
               Effect.tryPromise({
                 try: (signal) => {
                   // Interruption kills the isolated process; the next request reloads the model.
                   signal.addEventListener("abort", () => dropModel(inference), { once: true });
-                  return inference.transcribe(pcm, {
-                    timestamps: "none",
-                    ...(language === "auto" ? {} : { language }),
-                    ...(translateToEnglish
-                      ? { task: "translate" as const, targetLanguage: "en" as const }
-                      : {}),
-                    ...(customWords.length > 0 && inference.supportsInitialPrompt
-                      ? {
-                          family: {
-                            kind: "whisper" as const,
-                            initialPrompt: customWords.join(", "),
-                          },
-                        }
-                      : {}),
-                  });
+                  return inference.transcribe(
+                    pcm,
+                    {
+                      timestamps: "none",
+                      ...(language === "auto" ? {} : { language }),
+                      ...(translateToEnglish
+                        ? { task: "translate" as const, targetLanguage: "en" as const }
+                        : {}),
+                      ...(vocabularyFor(inference).length > 0 ? { vocabulary: customWords } : {}),
+                    },
+                    options.speechSilenceFiltering,
+                    vadPath,
+                  );
                 },
                 catch: (cause) => {
                   dropModel(inference);
@@ -606,7 +634,7 @@ const make = Effect.gen(function* () {
               }),
             );
             const correct = makeSpeechTextCorrector(
-              inference.supportsInitialPrompt ? [] : customWords,
+              vocabularyFor(inference).length > 0 ? [] : customWords,
               dictionary,
             );
             return finalizeTranscript(
@@ -673,19 +701,36 @@ const make = Effect.gen(function* () {
     const definition = selectedModel(settings);
     const language = effectiveSpeechLanguage(definition, options.speechLanguage);
     const dictionary = normalizeSpeechCustomWords(options.speechCustomWords);
-    const correct = makeSpeechTextCorrector(
-      dictionary.map(({ term }) => term),
-      dictionary,
-    );
+    const customWords = dictionary.map(({ term }) => term);
+    let correct = makeSpeechTextCorrector(customWords, dictionary);
     const modelPath = yield* installedModelPath(definition);
     let streamModel = yield* attempt(operation, () =>
       loadModel(modelPath, definition, signal, settings.speechAcceleration),
     );
     loaded = streamModel;
+    const vadPath = yield* silenceModelPath(streamModel, options);
+    let translateToEnglish = false;
     const beginStream = async () => {
-      if (!streamModel.supportsStreaming)
-        throw new Error("The selected model does not support streaming.");
-      await streamModel.begin(language === "auto" ? undefined : language);
+      translateToEnglish =
+        options.speechTranslateToEnglish &&
+        !streamModel.supportsStreaming &&
+        streamModel.supportsTranslation &&
+        language !== "en";
+      const vocabulary =
+        streamModel.supportsVocabulary && !translateToEnglish && customWords.length
+          ? customWords
+          : undefined;
+      await streamModel.begin(
+        {
+          timestamps: "none",
+          ...(language === "auto" ? {} : { language }),
+          ...(translateToEnglish ? { task: "translate", targetLanguage: "en" } : {}),
+          ...(vocabulary ? { vocabulary } : {}),
+        },
+        options.speechSilenceFiltering,
+        vadPath,
+      );
+      correct = makeSpeechTextCorrector(vocabulary ? [] : customWords, dictionary);
       started = true;
     };
     // Audio already fed is kept so a CPU restart can replay it; the limit caps it at one recording.
@@ -744,7 +789,7 @@ const make = Effect.gen(function* () {
               byteLength: bytes.byteLength,
               message: "Speech stream audio limit exceeded.",
             });
-          const pcm = decodeSpeechPcm(bytes, true);
+          const pcm = decodeSpeechPcm(bytes);
           byteLength += bytes.byteLength;
           received.push(pcm);
           let update: Awaited<ReturnType<LoadedModel["feed"]>> | undefined;
@@ -767,12 +812,22 @@ const make = Effect.gen(function* () {
           };
         }),
       finish: run(async () => {
-        const text = await streamModel.finish();
+        let text: string;
+        try {
+          text = await streamModel.finish().catch(async (cause: unknown) => {
+            await recoverOnCpu(cause);
+            if (closed || signal.aborted) throw cause;
+            return streamModel.finish();
+          });
+        } catch (cause) {
+          started = false;
+          throw cause;
+        }
         finished = true;
         return finalizeTranscript(
           correct(text),
           options,
-          language === "auto" ? undefined : language,
+          translateToEnglish ? "en" : language === "auto" ? undefined : language,
         );
       }),
     };
