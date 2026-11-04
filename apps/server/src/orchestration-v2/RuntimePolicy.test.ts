@@ -164,6 +164,33 @@ it.layer(layerTest)("RuntimePolicyV2", (it) => {
     }),
   );
 
+  it.effect("forces approval-required while a Matter is in Work mode", () =>
+    Effect.gen(function* () {
+      const policy = yield* RuntimePolicy.RuntimePolicyV2;
+      const now = yield* DateTime.now;
+      const matter = (matterMode: "ask" | "work") => ({
+        matterSelection: [
+          { matterId: "1001", name: "Doe v. Acme", orgId: 7, orgName: "Org", isProduction: false },
+        ],
+        matterMode,
+      });
+      const resolve = (matterMode: "ask" | "work") =>
+        policy.resolve({
+          thread: makeThread({
+            now,
+            worktreePath: "/work",
+            runtimeMode: "full-access",
+            matter: matter(matterMode),
+          }),
+          modelSelection,
+        });
+      const work = yield* resolve("work");
+      assert.equal(work.runtimeMode, "approval-required");
+      const ask = yield* resolve("ask");
+      assert.equal(ask.runtimeMode, "full-access");
+    }),
+  );
+
   it.effect("runs a mode the provider does not offer in Supervised", () =>
     Effect.gen(function* () {
       const policy = yield* RuntimePolicy.RuntimePolicyV2;

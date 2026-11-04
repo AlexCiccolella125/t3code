@@ -231,10 +231,13 @@ export async function createTask(input: {
   dueDate: string | undefined;
 }): Promise<LiveNote> {
   assertWritable(input.matterId, input.orgId);
+  // Filevine rejects a task without an assignee; the approving user is the default.
+  const s = await session(input.orgId);
   const raw = await request<RawNote>(input.orgId, "POST", "/fv-app/v2/tasks", {
     ProjectId: { Native: Number(input.matterId) },
     Subject: input.subject,
     Body: input.body,
+    AssigneeId: { Native: s.userId },
     ...(input.dueDate === undefined ? {} : { TargetDate: input.dueDate }),
   });
   return toNote(raw);

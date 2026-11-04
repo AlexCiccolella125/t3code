@@ -206,8 +206,14 @@ export const layerFromProjectStore: Layer.Layer<
                   ),
                 )).matterRole,
               });
+        // Work mode routes every Filevine write through an Approval card (ADR 0002); a
+        // bypassing runtime mode would let the provider skip the permission callback.
+        const runtimeMode =
+          matter?.mode === "work"
+            ? "approval-required"
+            : providerRuntimeMode(input.thread.runtimeMode, supportedRuntimeModes);
         return ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-          runtimeMode: providerRuntimeMode(input.thread.runtimeMode, supportedRuntimeModes),
+          runtimeMode,
           interactionMode: input.thread.interactionMode,
           cwd,
           ...(maxRuntimeMode === undefined ? {} : { maxRuntimeMode }),

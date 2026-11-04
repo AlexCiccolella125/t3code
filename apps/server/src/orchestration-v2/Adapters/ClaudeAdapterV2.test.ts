@@ -457,6 +457,26 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     });
   });
 
+  it("keeps the permission callback for a Matter in Work mode under full access", () => {
+    const queryPolicy = ClaudeAdapterV2.claudeRuntimeQueryPolicyForRuntimePolicy(
+      ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        cwd: "/workspace",
+        matter: {
+          selection: [
+            { matterId: "1001", name: "Doe v. Acme", orgId: 7, orgName: "Org", isProduction: false },
+          ],
+          mode: "work",
+          role: "attorney",
+        },
+      }),
+    );
+
+    assert.equal(queryPolicy.permissionMode, "default");
+    assert.equal(queryPolicy.installPermissionCallback, true);
+  });
+
   it("keeps approval checks when Full access must fall back to an allowed Claude mode", () => {
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
       runtimeMode: "full-access",

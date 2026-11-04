@@ -1898,7 +1898,7 @@ export function claudeMatterBriefing(matter: ClaudeMatterPolicy): string {
     `The user is a ${matter.role}.`,
     modeLine,
     `Matters in this thread's selection:\n${matters}`,
-    "Call filevine_list_matters first.",
+    "Call filevine_list_matters first. This briefing is current: if it disagrees with an earlier tool result or message in this conversation (for example after the mode changed), the briefing wins, so call filevine_list_matters again before deciding a Matter is read-only.",
     "Cite facts as [[cite:<citeId>]] immediately after the sentence they support, using citeIds from tool results; never invent one.",
     "Each write names exactly one matterId from the selection; propose one write per record; do not batch.",
     "After a write, do not restate the body; summarise what was written and where in one sentence.",
@@ -2717,6 +2717,11 @@ function permissionModeForClaudeRuntimePolicy(
   if (runtimePolicy.interactionMode === "plan") {
     return "plan";
   }
+  // Under bypassPermissions the SDK never calls canUseTool, so a Matter in Work mode
+  // must keep the default mode or Filevine writes would skip the Approval card.
+  if (runtimePolicy.matter?.mode === "work") {
+    return "default";
+  }
   if (runtimePolicy.approvalPolicy === "never") {
     switch (sandboxPolicyKindForClaudeRuntimePolicy(runtimePolicy)) {
       case "readOnly":
@@ -2800,6 +2805,7 @@ export function claudeRuntimeQueryPolicyForRuntimePolicy(
   // acceptEdits approves edits before the callback; the callback must ask for everything else.
   const installPermissionCallback =
     downgraded ||
+    runtimePolicy.matter?.mode === "work" ||
     (runtimePolicy.approvalPolicy === undefined
       ? runtimePolicy.runtimeMode === "approval-required" ||
         runtimePolicy.runtimeMode === "auto-accept-edits"
