@@ -1004,7 +1004,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     isActive: props.isActive,
   });
 
-  const title = isRenaming ? (
+  const titleText = isRenaming ? (
     <ThreadRenameInput
       title={renamingTitle}
       onTitleChange={onRenameTitleChange}
@@ -1043,6 +1043,21 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       {thread.title}
     </span>
   );
+  const extraMatterCount = (thread.matterSelection?.length ?? 0) - 1;
+  const title =
+    extraMatterCount > 0 && !isRenaming ? (
+      <>
+        {titleText}
+        <span
+          className="shrink-0 text-2xs text-muted-foreground"
+          aria-label={`and ${extraMatterCount} more matters`}
+        >
+          +{extraMatterCount}
+        </span>
+      </>
+    ) : (
+      titleText
+    );
   const accessibleTitle = isRenaming ? null : <span className="sr-only">{thread.title}</span>;
 
   const prBadgeShape = supportsMultiplePullRequests

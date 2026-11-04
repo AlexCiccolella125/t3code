@@ -1,5 +1,7 @@
 import {
   type EnvironmentId,
+  type MatterMode,
+  type MatterSelection,
   type ModelSelection,
   type RuntimeMode,
   type ThreadId,
@@ -50,6 +52,8 @@ interface MultipleModelSendInput {
   readonly composerRef: ComposerHandleRef;
   readonly promptRef: { current: string };
   readonly runtimeMode: RuntimeMode;
+  readonly matterSelection: MatterSelection | undefined;
+  readonly matterMode: MatterMode;
   readonly startFromOrigin: boolean;
   readonly resetLocalDispatch: ReturnType<typeof useLocalDispatchState>["resetLocalDispatch"];
   readonly setThreadError: ReturnType<typeof makeThreadErrorSetter>;
@@ -70,6 +74,8 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     composerRef,
     promptRef,
     runtimeMode,
+    matterSelection,
+    matterMode,
     startFromOrigin,
     resetLocalDispatch,
     setThreadError,
@@ -182,6 +188,8 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                       modelSelection: target.selection,
                       runtimeMode,
                       interactionMode: target.interactionMode,
+                      ...(matterSelection === undefined ? {} : { matterSelection }),
+                      matterMode,
                       branch,
                       worktreePath: null,
                       createdAt: createdAt,

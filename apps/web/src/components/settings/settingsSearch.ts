@@ -595,6 +595,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["enter return command ctrl multiline prompt new line composer"],
   },
   {
+    id: "matter-role",
+    title: "Matter role",
+    to: "/settings/chat",
+    scope: "environment",
+    searchTerms: ["matter filevine paralegal attorney ask work mode role production"],
+  },
+  {
     id: "follow-up-behavior",
     title: "Follow-up behavior",
     to: "/settings/chat",

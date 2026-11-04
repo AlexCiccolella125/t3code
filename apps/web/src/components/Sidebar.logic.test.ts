@@ -33,6 +33,7 @@ import {
   type SidebarListMarker,
   type SidebarSection,
   resolveSidebarDropVerb,
+  groupSidebarThreadsByMatter,
   groupSidebarThreadsByProject,
   resolveSidebarFolderDot,
   sidebarFolderExpansionKeys,
@@ -1552,6 +1553,43 @@ describe("sidebarFolderExpansionKeys", () => {
     expect(resolveProjectExpanded({}, keys)).toBe(true);
     expect(resolveProjectExpanded({ [cwdKey]: false }, keys)).toBe(false);
     expect(resolveProjectExpanded({ [keys[0]!]: true, [cwdKey]: false }, keys)).toBe(true);
+  });
+});
+
+describe("groupSidebarThreadsByMatter", () => {
+  it("lists a thread under its first Matter and leaves threads without one in place", () => {
+    const sandbox = {
+      matterId: "90000107",
+      name: "Sample Matter 07",
+      orgId: 9234,
+      orgName: "DTL Sandbox",
+      isProduction: false,
+    };
+    const production = {
+      ...sandbox,
+      matterId: "90000101",
+      name: "Sample Matter 01",
+      isProduction: true,
+    };
+    const threads = [
+      { id: "plain" },
+      { id: "multi", matterSelection: [production, sandbox] },
+      { id: "sandbox", matterSelection: [sandbox] },
+      { id: "production", matterSelection: [production] },
+      { id: "cleared", matterSelection: [] },
+    ];
+
+    const { matterGroups, rest } = groupSidebarThreadsByMatter(threads);
+    expect(
+      matterGroups.map((group) => [
+        group.matter.matterId,
+        group.threads.map((thread) => thread.id),
+      ]),
+    ).toEqual([
+      ["90000101", ["multi", "production"]],
+      ["90000107", ["sandbox"]],
+    ]);
+    expect(rest.map((thread) => thread.id)).toEqual(["plain", "cleared"]);
   });
 });
 

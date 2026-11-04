@@ -1,6 +1,8 @@
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
+  type MatterMode,
+  type MatterRef,
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -42,12 +44,15 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
+import { MatterHeaderSummary } from "../matter/MatterHeaderSummary";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
   activeThreadId: ThreadId;
   activeThreadTitle: string;
   activeThreadLinkOrigin?: string | null | undefined;
+  matterSelection: ReadonlyArray<MatterRef>;
+  matterMode: MatterMode;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -75,6 +80,8 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadId,
   activeThreadTitle,
   activeThreadLinkOrigin,
+  matterSelection,
+  matterMode,
   isServerThread,
   activeProject,
   parentThreadLink,
@@ -430,6 +437,7 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
+      <MatterHeaderSummary selection={matterSelection} mode={matterMode} />
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
     </div>
   );

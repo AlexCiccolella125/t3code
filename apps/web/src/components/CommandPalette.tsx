@@ -63,6 +63,7 @@ import {
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
+  BriefcaseIcon,
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -77,6 +78,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
+import { openMatterPicker } from "./matter/ComposerMatterBar";
 import {
   useDeferredValue,
   useEffect,
@@ -1304,6 +1306,19 @@ function OpenCommandPaletteDialog(props: {
       shortcutCommand: "chat.find",
       run: async () => {
         openThreadFind(activeThreadKey);
+      },
+    });
+  }
+
+  if (paletteRouteTarget !== null) {
+    actionItems.push({
+      kind: "action",
+      value: "action:select-matter",
+      title: "Select Matter…",
+      searchTerms: ["matter", "filevine", "case", "picker", "ask", "work"],
+      icon: <BriefcaseIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openMatterPicker();
       },
     });
   }

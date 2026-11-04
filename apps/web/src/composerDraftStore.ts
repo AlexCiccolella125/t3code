@@ -11,6 +11,10 @@ import {
   ProjectId,
   ProviderInstanceId,
   ProviderInteractionMode,
+  MatterMode,
+  MatterRef,
+  DEFAULT_MATTER_MODE,
+  type MatterSelection,
   ProviderDriverKind,
   ProviderOptionSelection,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -103,6 +107,8 @@ import { UnifiedSettings } from "@t3tools/contracts/settings";
 const isElementContextDetails = Schema.is(ElementContextDetails);
 import { ReviewCommentContextSchema, type ReviewCommentContext } from "./reviewCommentContext";
 const isRuntimeMode = Schema.is(RuntimeMode);
+const isMatterMode = Schema.is(MatterMode);
+const isMatterRefArray = Schema.is(Schema.Array(MatterRef));
 const isProviderDriverKind = Schema.is(ProviderDriverKind);
 const isReviewCommentContext = Schema.is(ReviewCommentContextSchema);
 const isThreadContextRecord = Schema.is(ThreadContextRecord);
@@ -315,6 +321,8 @@ const PersistedDraftThreadState = Schema.Struct({
   createdAt: Schema.String,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  matterSelection: Schema.optionalKey(Schema.Array(MatterRef)),
+  matterMode: Schema.optionalKey(MatterMode),
   branch: Schema.NullOr(Schema.String),
   worktreePath: Schema.NullOr(Schema.String),
   envMode: DraftThreadEnvModeSchema,
@@ -408,6 +416,8 @@ export interface DraftSessionState {
   createdAt: string;
   runtimeMode: RuntimeMode;
   interactionMode: ProviderInteractionMode;
+  matterSelection: ReadonlyArray<MatterRef>;
+  matterMode: MatterMode;
   branch: string | null;
   worktreePath: string | null;
   envMode: DraftThreadEnvMode;
@@ -464,6 +474,8 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
+      matterSelection?: ReadonlyArray<MatterRef>;
+      matterMode?: MatterMode;
       environmentSelection?: "auto" | "manual";
       loadBalancedEnvironmentId?: EnvironmentId | null;
     },
@@ -480,6 +492,8 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
+      matterSelection?: ReadonlyArray<MatterRef>;
+      matterMode?: MatterMode;
       environmentSelection?: "auto" | "manual";
       loadBalancedEnvironmentId?: EnvironmentId | null;
     },
@@ -495,6 +509,8 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
+      matterSelection?: ReadonlyArray<MatterRef>;
+      matterMode?: MatterMode;
       environmentSelection?: "auto" | "manual";
       loadBalancedEnvironmentId?: EnvironmentId | null;
     },
@@ -884,6 +900,23 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
     draft.runtimeMode === null &&
     draft.interactionMode === null
   );
+}
+
+function matterSelectionsEqual(
+  left: ReadonlyArray<MatterRef>,
+  right: ReadonlyArray<MatterRef>,
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((matter, index) => matter.matterId === right[index]?.matterId)
+  );
+}
+
+/** The server schema wants 1..6 entries; an empty draft selection is sent as "no Matter". */
+export function toMatterSelection(
+  selection: ReadonlyArray<MatterRef> | null | undefined,
+): MatterSelection | undefined {
+  return selection && selection.length > 0 ? (selection as MatterSelection) : undefined;
 }
 
 function normalizeProviderDriverKind(value: unknown): ProviderDriverKind | null {
@@ -1479,6 +1512,8 @@ function createDraftThreadState(
     startFromOrigin?: boolean;
     runtimeMode?: RuntimeMode;
     interactionMode?: ProviderInteractionMode;
+    matterSelection?: ReadonlyArray<MatterRef>;
+    matterMode?: MatterMode;
     environmentSelection?: "auto" | "manual";
     loadBalancedEnvironmentId?: EnvironmentId | null;
   },
@@ -1524,6 +1559,8 @@ function createDraftThreadState(
     runtimeMode: options?.runtimeMode ?? existingThread?.runtimeMode ?? DEFAULT_RUNTIME_MODE,
     interactionMode:
       options?.interactionMode ?? existingThread?.interactionMode ?? DEFAULT_INTERACTION_MODE,
+    matterSelection: options?.matterSelection ?? existingThread?.matterSelection ?? [],
+    matterMode: options?.matterMode ?? existingThread?.matterMode ?? DEFAULT_MATTER_MODE,
     branch: nextBranch,
     worktreePath: nextWorktreePath,
     envMode:
@@ -1559,6 +1596,8 @@ function draftThreadsEqual(left: DraftThreadState | undefined, right: DraftThrea
     left.createdAt === right.createdAt &&
     left.runtimeMode === right.runtimeMode &&
     left.interactionMode === right.interactionMode &&
+    matterSelectionsEqual(left.matterSelection, right.matterSelection) &&
+    left.matterMode === right.matterMode &&
     left.branch === right.branch &&
     left.worktreePath === right.worktreePath &&
     left.envMode === right.envMode &&
@@ -1707,6 +1746,12 @@ function normalizePersistedDraftThreads(
           candidateDraftThread.interactionMode === "default"
             ? candidateDraftThread.interactionMode
             : DEFAULT_INTERACTION_MODE,
+        matterSelection: isMatterRefArray(candidateDraftThread.matterSelection)
+          ? candidateDraftThread.matterSelection
+          : [],
+        matterMode: isMatterMode(candidateDraftThread.matterMode)
+          ? candidateDraftThread.matterMode
+          : DEFAULT_MATTER_MODE,
         branch: typeof branch === "string" ? branch : null,
         worktreePath: normalizedWorktreePath,
         envMode: normalizeDraftThreadEnvMode(candidateDraftThread.envMode, normalizedWorktreePath),
@@ -1767,6 +1812,8 @@ function normalizePersistedDraftThreads(
           createdAt: new Date().toISOString(),
           runtimeMode: DEFAULT_RUNTIME_MODE,
           interactionMode: DEFAULT_INTERACTION_MODE,
+          matterSelection: [],
+          matterMode: DEFAULT_MATTER_MODE,
           branch: null,
           worktreePath: null,
           envMode: "local",
@@ -2191,7 +2238,10 @@ export function partializeComposerDraftStoreState(
     if (!keptSessionKeys.has(threadKey)) {
       continue;
     }
-    persistedDraftThreadsByThreadKey[threadKey] = draftThread;
+    persistedDraftThreadsByThreadKey[threadKey] = {
+      ...draftThread,
+      matterSelection: [...draftThread.matterSelection],
+    };
   }
   return {
     draftsByThreadKey: persistedDraftsByThreadKey,
@@ -2471,6 +2521,8 @@ function toHydratedDraftThreadState(
     createdAt: persistedDraftThread.createdAt,
     runtimeMode: persistedDraftThread.runtimeMode,
     interactionMode: persistedDraftThread.interactionMode,
+    matterSelection: persistedDraftThread.matterSelection ?? [],
+    matterMode: persistedDraftThread.matterMode ?? DEFAULT_MATTER_MODE,
     branch: persistedDraftThread.branch,
     worktreePath: persistedDraftThread.worktreePath,
     envMode: persistedDraftThread.envMode,
@@ -2761,6 +2813,8 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
                   : options.createdAt || existing.createdAt,
               runtimeMode: options.runtimeMode ?? existing.runtimeMode,
               interactionMode: options.interactionMode ?? existing.interactionMode,
+              matterSelection: options.matterSelection ?? existing.matterSelection,
+              matterMode: options.matterMode ?? existing.matterMode,
               branch: nextBranch,
               worktreePath: nextWorktreePath,
               envMode:
@@ -2777,6 +2831,8 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftThread.createdAt === existing.createdAt &&
               nextDraftThread.runtimeMode === existing.runtimeMode &&
               nextDraftThread.interactionMode === existing.interactionMode &&
+              matterSelectionsEqual(nextDraftThread.matterSelection, existing.matterSelection) &&
+              nextDraftThread.matterMode === existing.matterMode &&
               nextDraftThread.branch === existing.branch &&
               nextDraftThread.worktreePath === existing.worktreePath &&
               nextDraftThread.envMode === existing.envMode &&

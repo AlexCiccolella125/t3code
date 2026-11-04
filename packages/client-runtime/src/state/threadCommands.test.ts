@@ -250,6 +250,36 @@ describe("interrupt turn", () => {
   );
 });
 
+describe("set matter", () => {
+  it.effect("dispatches thread.matter.set with the selection and mode", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness();
+      const matterSelection = [
+        {
+          matterId: "90000107",
+          name: "Sample Matter 07",
+          orgId: 9234,
+          orgName: "DTL Sandbox",
+          isProduction: false,
+        },
+      ];
+      const result = h.commands.setMatter.run(h.registry, {
+        environmentId: ENVIRONMENT_ID,
+        input: { threadId: THREAD_ID, matterSelection, matterMode: "work" },
+      });
+      const request = yield* Queue.take(h.requests);
+      expect(request.command).toMatchObject({
+        type: "thread.matter.set",
+        threadId: THREAD_ID,
+        matterSelection,
+        matterMode: "work",
+      });
+      yield* Deferred.succeed(request.reply, { sequence: 1 });
+      expect((yield* Effect.promise(() => result))._tag).toBe("Success");
+    }),
+  );
+});
+
 describe("remote thread lifecycle commands", () => {
   const actions = [
     ["settle", {}, { settledOverride: "settled", pinnedAt: null, snoozedUntil: null }],

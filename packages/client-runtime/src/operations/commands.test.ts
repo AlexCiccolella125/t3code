@@ -43,6 +43,13 @@ import {
   startThreadTurn,
 } from "./commands.ts";
 
+const sandboxMatter = {
+  matterId: "90000107",
+  name: "Sample Matter 07: sandbox demo, motorcycle",
+  orgId: 9234,
+  orgName: "DTL Sandbox",
+  isProduction: false,
+} as const;
 const layerTestRandom = Layer.succeed(
   SecureRandom.SecureRandom,
   SecureRandom.make((size) => new Uint8Array(size)),
@@ -237,6 +244,8 @@ describe("V2 environment commands", () => {
             modelSelection: v2Projection.thread.modelSelection,
             runtimeMode: "full-access",
             interactionMode: "default",
+            matterSelection: [sandboxMatter],
+            matterMode: "work",
             branch: "feature",
             worktreePath: "/workspace/project-worktrees/feature",
             createdAt: "2026-06-20T00:00:00.000Z",
@@ -248,6 +257,8 @@ describe("V2 environment commands", () => {
         threadId: v2ThreadId,
         title: "Continue here",
         generateTitle: true,
+        matterSelection: [sandboxMatter],
+        matterMode: "work",
         workspaceStrategy: {
           type: "existing_worktree",
           worktreePath: "/workspace/project-worktrees/feature",

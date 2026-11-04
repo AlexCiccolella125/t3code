@@ -1072,6 +1072,11 @@ export function GeneralSettingsPanel() {
   );
 }
 
+const MATTER_ROLE_OPTIONS = [
+  { value: "paralegal", label: "Paralegal" },
+  { value: "attorney", label: "Attorney" },
+] as const;
+
 export function ChatSettingsPanel() {
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
@@ -1150,6 +1155,50 @@ export function ChatSettingsPanel() {
                     <span className="flex items-center justify-between gap-4">
                       {option.label}
                       {settings.sendShortcut === option.value && <CheckIcon aria-hidden="true" />}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("matter-role")}
+          description="A paralegal can only Ask on a production org. An attorney can Work on any Matter."
+          resetAction={
+            settings.matterRole !== DEFAULT_UNIFIED_SETTINGS.matterRole ? (
+              <SettingResetButton
+                label="matter role"
+                onClick={() => updateSettings({ matterRole: DEFAULT_UNIFIED_SETTINGS.matterRole })}
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.matterRole}
+              onValueChange={(value) => {
+                const option = MATTER_ROLE_OPTIONS.find((option) => option.value === value);
+                if (option) updateSettings({ matterRole: option.value });
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0 max-w-full"
+                aria-label="Matter role"
+              >
+                <SelectValue>
+                  {
+                    MATTER_ROLE_OPTIONS.find((option) => option.value === settings.matterRole)
+                      ?.label
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {MATTER_ROLE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <span className="flex items-center justify-between gap-4">
+                      {option.label}
+                      {settings.matterRole === option.value && <CheckIcon aria-hidden="true" />}
                     </span>
                   </SelectItem>
                 ))}

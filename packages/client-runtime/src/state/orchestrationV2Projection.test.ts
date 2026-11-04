@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  type MatterSelection,
   type ThreadPullRequestLink,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2Run,
@@ -186,6 +187,32 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
     const next = applyOrchestrationV2ProjectionEvent(emptyProjection, event);
     expect(next?.thread.archivedAt).toEqual(archivedAt);
     expect(next?.updatedAt).toEqual(archivedAt);
+
+    const matterSelection: MatterSelection = [
+      {
+        matterId: "90000107",
+        name: "Sample Matter 07",
+        orgId: 9234,
+        orgName: "DTL Sandbox",
+        isProduction: false,
+      },
+    ];
+    const matterEvent = {
+      id: "event-matter",
+      type: "thread.matter-updated",
+      threadId,
+      occurredAt: archivedAt,
+      payload: {
+        ...emptyProjection.thread,
+        matterSelection,
+        matterMode: "work" as const,
+        updatedAt: archivedAt,
+      },
+    } as OrchestrationV2DomainEvent;
+    const matterUpdated = applyOrchestrationV2ProjectionEvent(emptyProjection, matterEvent);
+    expect(matterUpdated?.thread.matterSelection).toEqual(matterSelection);
+    expect(matterUpdated?.thread.matterMode).toBe("work");
+    expect(matterUpdated?.updatedAt).toEqual(archivedAt);
   });
 
   it("preserves visible row identity when run updates do not change membership", () => {

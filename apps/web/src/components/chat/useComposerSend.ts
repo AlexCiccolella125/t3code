@@ -19,6 +19,8 @@ import {
   AuthOrchestrationOperateScope,
   DEFAULT_MODEL,
   type EnvironmentId,
+  type MatterMode,
+  type MatterRef,
   type ModelSelection,
   type PreviewAnnotationPayload,
   type ThreadId,
@@ -74,6 +76,7 @@ import {
   type ComposerFileAttachment,
   type ComposerImageAttachment,
   type DraftThreadEnvMode,
+  toMatterSelection,
   useComposerDraftStore,
   DraftId,
 } from "../../composerDraftStore";
@@ -182,6 +185,8 @@ interface ComposerSendInput {
   readonly isGitRepo: boolean;
   readonly phase: SessionPhase;
   readonly runtimeMode: RuntimeMode;
+  readonly matterSelection: ReadonlyArray<MatterRef>;
+  readonly matterMode: MatterMode;
   readonly sendEnvMode: DraftThreadEnvMode;
   readonly startFromOrigin: boolean;
   readonly localCheckoutBranchMismatch: {
@@ -280,6 +285,8 @@ export function useComposerSend(input: ComposerSendInput) {
     isGitRepo,
     phase,
     runtimeMode,
+    matterSelection,
+    matterMode,
     sendEnvMode,
     startFromOrigin,
     localCheckoutBranchMismatch,
@@ -368,6 +375,8 @@ export function useComposerSend(input: ComposerSendInput) {
     composerRef,
     promptRef,
     runtimeMode,
+    matterSelection: toMatterSelection(matterSelection),
+    matterMode,
     startFromOrigin,
     resetLocalDispatch,
     setThreadError,
@@ -1256,6 +1265,8 @@ export function useComposerSend(input: ComposerSendInput) {
       ctxSelectedModelSelection.options,
     );
 
+    const threadCreateMatterSelection = toMatterSelection(matterSelection);
+
     let failure: AtomCommandResult<unknown, unknown> | null = null;
 
     if (failure === null && isServerThread) {
@@ -1321,6 +1332,10 @@ export function useComposerSend(input: ComposerSendInput) {
                       modelSelection: threadCreateModelSelection,
                       runtimeMode,
                       interactionMode: sendInteractionMode,
+                      ...(threadCreateMatterSelection === undefined
+                        ? {}
+                        : { matterSelection: threadCreateMatterSelection }),
+                      matterMode,
                       branch: activeThreadBranch,
                       worktreePath: activeThread.worktreePath,
                       createdAt: activeThread.createdAt,

@@ -21,6 +21,7 @@ import {
   isListedThreadLineage,
   type ContextMenuItem,
   type EnvironmentId,
+  type MatterRef,
   type ThreadId,
 } from "@t3tools/contracts";
 import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
@@ -982,6 +983,27 @@ export function groupSidebarThreadsByProject<
     folderByProject.get(`${thread.environmentId}:${thread.projectId}`)?.threads.push(thread);
   }
   return folders.filter((folder) => folder.threads.length > 0 || keepEmpty(folder.group));
+}
+
+/** Active threads with a Matter list under their first Matter; the rest keep their grouping. */
+export function groupSidebarThreadsByMatter<
+  TThread extends { readonly matterSelection?: ReadonlyArray<MatterRef> | undefined },
+>(
+  threads: readonly TThread[],
+): { matterGroups: Array<{ matter: MatterRef; threads: TThread[] }>; rest: TThread[] } {
+  const groupByMatterId = new Map<string, { matter: MatterRef; threads: TThread[] }>();
+  const rest: TThread[] = [];
+  for (const thread of threads) {
+    const first = thread.matterSelection?.[0];
+    if (first === undefined) {
+      rest.push(thread);
+      continue;
+    }
+    const group = groupByMatterId.get(first.matterId);
+    if (group) group.threads.push(thread);
+    else groupByMatterId.set(first.matterId, { matter: first, threads: [thread] });
+  }
+  return { matterGroups: [...groupByMatterId.values()], rest };
 }
 
 export type SidebarV2TopStatusKind =

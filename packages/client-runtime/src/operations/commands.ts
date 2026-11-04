@@ -27,6 +27,8 @@ import {
   type ThreadEnvMode,
   type UploadChatAttachment,
   type GuestMessageId,
+  type MatterMode,
+  type MatterSelection,
 } from "@t3tools/contracts";
 import { derivePendingBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
@@ -76,6 +78,8 @@ export interface CreateThreadInput extends CommandMetadata {
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
+  readonly matterSelection?: MatterSelection;
+  readonly matterMode?: MatterMode;
   readonly branch: string | null;
   readonly worktreePath: string | null;
 }
@@ -145,6 +149,11 @@ export interface SetThreadInteractionModeInput extends ThreadCommandInput {
   readonly interactionMode: ProviderInteractionMode;
 }
 
+export interface SetThreadMatterInput extends ThreadCommandInput {
+  readonly matterSelection?: MatterSelection;
+  readonly matterMode: MatterMode;
+}
+
 interface StartThreadBootstrap {
   readonly createThread?: {
     readonly projectId: ProjectId;
@@ -152,6 +161,8 @@ interface StartThreadBootstrap {
     readonly modelSelection: ModelSelection;
     readonly runtimeMode: RuntimeMode;
     readonly interactionMode: ProviderInteractionMode;
+    readonly matterSelection?: MatterSelection;
+    readonly matterMode?: MatterMode;
     readonly branch: string | null;
     readonly worktreePath: string | null;
     readonly createdAt: string;
@@ -407,6 +418,8 @@ export const createThread = Effect.fn("EnvironmentCommands.createThread")(functi
     modelSelection: input.modelSelection,
     runtimeMode: input.runtimeMode,
     interactionMode: input.interactionMode,
+    ...(input.matterSelection === undefined ? {} : { matterSelection: input.matterSelection }),
+    ...(input.matterMode === undefined ? {} : { matterMode: input.matterMode }),
     branch: input.branch,
     worktreePath: input.worktreePath,
   });
@@ -667,6 +680,18 @@ export const setThreadInteractionMode = Effect.fn("EnvironmentCommands.setThread
   },
 );
 
+export const setThreadMatter = Effect.fn("EnvironmentCommands.setThreadMatter")(function* (
+  input: SetThreadMatterInput,
+) {
+  return yield* dispatch({
+    type: "thread.matter.set",
+    commandId: yield* allocateCommandId(input),
+    threadId: input.threadId,
+    ...(input.matterSelection === undefined ? {} : { matterSelection: input.matterSelection }),
+    matterMode: input.matterMode,
+  });
+});
+
 export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(function* (
   input: StartThreadTurnInput,
 ) {
@@ -720,6 +745,8 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
       modelSelection: input.modelSelection ?? thread.modelSelection,
       runtimeMode: input.runtimeMode,
       interactionMode: input.interactionMode,
+      ...(thread.matterSelection === undefined ? {} : { matterSelection: thread.matterSelection }),
+      ...(thread.matterMode === undefined ? {} : { matterMode: thread.matterMode }),
       workspaceStrategy,
       initialMessage: {
         messageId: input.message.messageId,

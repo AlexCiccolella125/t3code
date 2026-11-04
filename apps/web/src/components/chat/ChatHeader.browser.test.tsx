@@ -30,6 +30,8 @@ function header(title: string) {
         activeThreadEnvironmentId={EnvironmentId.make("environment")}
         activeThreadId={ThreadId.make("thread")}
         activeThreadTitle={title}
+        matterSelection={[]}
+        matterMode="ask"
         isServerThread
         activeProject={null}
         parentThreadLink={null}
