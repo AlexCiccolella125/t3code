@@ -1,6 +1,7 @@
 import type { ThreadStructure, ThreadStructureRuntime } from "@t3tools/client-runtime/state/shell";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import {
+  isFilevineWriteToolName,
   type AssetResource,
   type OrchestrationV2Checkpoint,
   type OrchestrationV2ExecutionNode,
@@ -727,7 +728,12 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
       continue;
     }
 
-    if (STANDALONE_V2_ITEM_TYPES.has(item.type)) {
+    if (
+      STANDALONE_V2_ITEM_TYPES.has(item.type) ||
+      (item.type === "dynamic_tool" &&
+        (item.status === "completed" || item.status === "failed") &&
+        isFilevineWriteToolName(item.toolName ?? ""))
+    ) {
       entries.push({
         id: item.id,
         kind: "event",

@@ -276,6 +276,7 @@ import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
 import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
 import { resolveScrollToEndClearance } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
+import { useThreadMatter } from "./matter/useThreadMatter";
 import { useSideChat } from "./chat/useSideChat";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
@@ -796,6 +797,13 @@ export default function ChatView(props: ChatViewProps) {
     : undefined;
   const isServerThread = serverThread !== null;
   const activeThread = isServerThread ? serverThread : localDraftThread;
+  const threadMatter = useThreadMatter({
+    environmentId,
+    threadId,
+    draftTarget: baseComposerDraftTarget,
+    serverThread,
+    draftThread,
+  });
   const serverLatestRun =
     serverProjection === null ? null : deriveLatestThreadRun(serverProjection);
   const serverActivityRun =
@@ -2901,6 +2909,8 @@ export default function ChatView(props: ChatViewProps) {
     isGitRepo,
     phase,
     runtimeMode,
+    matterSelection: threadMatter.selection,
+    matterMode: threadMatter.mode,
     sendEnvMode,
     startFromOrigin,
     localCheckoutBranchMismatch,
@@ -3330,6 +3340,8 @@ export default function ChatView(props: ChatViewProps) {
               isServerThread={isServerThread}
               activeThreadTitle={activeThread.title}
               activeThreadLinkOrigin={activeThreadShell?.linkOrigin?.label ?? null}
+              matterSelection={threadMatter.selection}
+              matterMode={threadMatter.mode}
               activeProject={activeProject ?? null}
               parentThreadLink={headerParentThreadLink}
               onOpenThread={onOpenRelatedThreadStable}
@@ -3586,6 +3598,7 @@ export default function ChatView(props: ChatViewProps) {
                               composerRef={composerRef}
                               composerDraftTarget={composerDraftTarget}
                               environmentId={environmentId}
+                              {...(embedded ? {} : { matter: threadMatter })}
                               attachmentUploadsCapabilityKnown={attachmentUploadsCapabilityKnown}
                               supportsAttachmentUploads={supportsAttachmentUploads}
                               supportsQuestionAttachments={supportsQuestionAttachments}
@@ -3988,6 +4001,14 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequests={addPullRequestsSurfaceStable}
           onAddDevice={addDeviceSurfaceStable}
           onAddSideChat={sideChatsOffered ? openSideChatStable : undefined}
+          {...(isServerThread && threadMatter.selection.length > 0
+            ? {
+                onAddMatterProofs: () =>
+                  useRightPanelStore.getState().open(activeThreadRef, "matter-proofs"),
+                onAddMatterLedger: () =>
+                  useRightPanelStore.getState().open(activeThreadRef, "matter-ledger"),
+              }
+            : {})}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
           diffAvailable={isServerThread && isGitRepo}

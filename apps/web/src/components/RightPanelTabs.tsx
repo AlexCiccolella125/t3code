@@ -41,10 +41,12 @@ import {
   ChevronLeft,
   ChevronRight,
   FileDiff,
+  FileSearch,
   Files,
   Globe2,
   MessagesSquare,
   Plus,
+  ScrollText,
   TerminalSquare,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
@@ -143,6 +145,9 @@ export interface RightPanelTabsProps {
   onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
+  /** Absent on threads without a Matter selection. */
+  onAddMatterProofs?: (() => void) | undefined;
+  onAddMatterLedger?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -206,6 +211,38 @@ const SURFACE_UNAVAILABLE_HINTS = {
   device: "Available from a thread.",
   sideChat: "Available after the first message.",
 } as const;
+
+function matterSurfaceActions(props: {
+  onAddMatterProofs?: (() => void) | undefined;
+  onAddMatterLedger?: (() => void) | undefined;
+}) {
+  return [
+    ...(props.onAddMatterProofs
+      ? [
+          {
+            label: "Proofs",
+            icon: FileSearch,
+            shortcut: "R",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddMatterProofs,
+          },
+        ]
+      : []),
+    ...(props.onAddMatterLedger
+      ? [
+          {
+            label: "Write ledger",
+            icon: ScrollText,
+            shortcut: "W",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddMatterLedger,
+          },
+        ]
+      : []),
+  ];
+}
 
 type TabContextMenuAction =
   | "rename"
@@ -324,6 +361,8 @@ function RightPanelEmptyState(props: {
   onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
+  onAddMatterProofs?: (() => void) | undefined;
+  onAddMatterLedger?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -407,6 +446,7 @@ function RightPanelEmptyState(props: {
           },
         ]
       : []),
+    ...matterSurfaceActions(props),
   ] as const;
 
   type SurfaceAction = (typeof actions)[number];
@@ -594,6 +634,10 @@ function surfaceTitle(
       return surface.title ?? surface.target?.name ?? "Device";
     case "side-chat":
       return "Side chat";
+    case "matter-proofs":
+      return "Proofs";
+    case "matter-ledger":
+      return "Write ledger";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
@@ -684,6 +728,10 @@ function SurfaceIcon({
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
     case "side-chat":
       return <SideChatTabIcon environmentId={environmentId} threadId={surface.threadId} />;
+    case "matter-proofs":
+      return <FileSearch className="size-3 shrink-0" />;
+    case "matter-ledger":
+      return <ScrollText className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -1159,6 +1207,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           },
         ]
       : []),
+    ...matterSurfaceActions(props),
   ] as const;
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -1534,6 +1583,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}
             onAddSideChat={props.onAddSideChat}
+            onAddMatterProofs={props.onAddMatterProofs}
+            onAddMatterLedger={props.onAddMatterLedger}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
             diffAvailable={props.diffAvailable}

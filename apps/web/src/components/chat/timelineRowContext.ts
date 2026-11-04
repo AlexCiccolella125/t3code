@@ -47,7 +47,11 @@ export interface TimelineRowSharedState {
   respondingRequestIds: ReadonlyArray<RuntimeRequestId>;
   canOperateThread: boolean;
   onRespondToApproval:
-    | ((requestId: RuntimeRequestId, decision: ProviderApprovalDecision) => Promise<unknown>)
+    | ((
+        requestId: RuntimeRequestId,
+        decision: ProviderApprovalDecision,
+        feedback?: string,
+      ) => Promise<unknown>)
     | undefined;
   citationRequest: AssistantCitationTarget | null;
   listRef: React.RefObject<LegendListRef | null>;

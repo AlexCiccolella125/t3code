@@ -22,6 +22,8 @@ const RIGHT_PANEL_KINDS = [
   "pull-request",
   "pull-requests",
   "side-chat",
+  "matter-proofs",
+  "matter-ledger",
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
@@ -76,7 +78,9 @@ export type RightPanelSurface =
       detailTab?: PullRequestDetailTab;
     }
   | { id: "pull-requests"; kind: "pull-requests" }
-  | { id: `side-chat:${string}`; kind: "side-chat"; threadId: ThreadId };
+  | { id: `side-chat:${string}`; kind: "side-chat"; threadId: ThreadId }
+  | { id: "matter-proofs"; kind: "matter-proofs"; citeId?: string }
+  | { id: "matter-ledger"; kind: "matter-ledger" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 const RIGHT_PANEL_STORAGE_VERSION = 14;
@@ -126,6 +130,8 @@ interface RightPanelStoreState {
     kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request" | "side-chat">,
   ) => void;
   openSideChat: (ref: ScopedThreadRef, threadId: ThreadId) => void;
+  /** Opens the Proofs panel with one Proof selected, or the list when `citeId` is null. */
+  openMatterProof: (ref: ScopedThreadRef, citeId: string | null) => void;
   openDevice: (ref: ScopedThreadRef, target: DeviceTabTarget, automatic?: boolean) => void;
   renameDevice: (ref: ScopedThreadRef, surfaceId: string, title: string) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
@@ -219,6 +225,10 @@ const singletonSurface = (
       return { id: "pull-requests", kind };
     case "device":
       return { id: "device", kind };
+    case "matter-proofs":
+      return { id: "matter-proofs", kind };
+    case "matter-ledger":
+      return { id: "matter-ledger", kind };
   }
 };
 
@@ -725,6 +735,24 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           userAction(state, scopedThreadKey(ref), (current) =>
             upsertSurface(current, { id: `side-chat:${threadId}`, kind: "side-chat", threadId }),
           ),
+        ),
+      openMatterProof: (ref, citeId) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            const surface: RightPanelSurface =
+              citeId === null
+                ? { id: "matter-proofs", kind: "matter-proofs" }
+                : { id: "matter-proofs", kind: "matter-proofs", citeId };
+            return upsertSurface(
+              {
+                ...current,
+                surfaces: current.surfaces.map((entry) =>
+                  entry.id === surface.id ? surface : entry,
+                ),
+              },
+              surface,
+            );
+          }),
         ),
       renameDevice: (ref, surfaceId, title) =>
         set((state) =>

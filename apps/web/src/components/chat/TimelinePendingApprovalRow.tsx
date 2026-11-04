@@ -8,6 +8,7 @@ import { type PendingApproval } from "../../session-logic";
 import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
+import { FilevineApprovalCard } from "../matter/FilevineApprovalCard";
 import { ToolActivityIconView, type WorkEntryIconName } from "./TimelineToolActivityIcon";
 import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
@@ -26,6 +27,11 @@ const APPROVAL_PRESENTATION = {
     label: "App access approval",
     detailLabel: "App access request",
   },
+  "filevine-write": {
+    icon: "square-pen",
+    label: "Filevine write",
+    detailLabel: "Review the proposed Filevine write",
+  },
 } satisfies Record<
   PendingApproval["requestKind"],
   { icon: WorkEntryIconName; label: string; detailLabel: string }
@@ -37,6 +43,18 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
   approval: PendingApproval;
 }) {
   const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
+  if (approval.requestKind === "filevine-write" && approval.filevineWrite !== undefined) {
+    return (
+      <FilevineApprovalCard
+        requestId={approval.requestId}
+        proposal={approval.filevineWrite}
+        canRespond={approval.responseCapability === "live"}
+        isResponding={respondingRequestIds.includes(approval.requestId)}
+        disabled={!canOperateThread}
+        onRespond={onRespondToApproval}
+      />
+    );
+  }
   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (

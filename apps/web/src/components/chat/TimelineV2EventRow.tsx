@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collaps
 import { EnvironmentSubagentAvatar, SubagentElapsed, V2LifecycleRow } from "./V2LifecycleRow";
 import { LinkRequestCard } from "./LinkRequestCard";
 import { SecretRequestCard } from "./SecretRequestCard";
+import { FilevineWriteReceiptRow } from "../matter/FilevineWriteReceipt";
 import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
 import { subagentGroupTiming } from "./TimelineV2EventRow.logic";
 
@@ -28,6 +29,17 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
         environmentId={ctx.activeThreadEnvironmentId}
         item={item}
         visibility={visibility}
+      />
+    );
+  }
+  if (item.type === "dynamic_tool") {
+    return (
+      <FilevineWriteReceiptRow
+        threadRef={scopeThreadRef(ctx.activeThreadEnvironmentId, item.threadId)}
+        itemId={item.id}
+        toolName={item.toolName}
+        failed={item.status === "failed"}
+        onSendMessage={ctx.onSendAppMessage}
       />
     );
   }
