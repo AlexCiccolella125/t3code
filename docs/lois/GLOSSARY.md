@@ -65,7 +65,8 @@ carries a Matter selection.
 _Avoid_: Conversation (LOIS's word), session
 
 **Ask**:
-The mode in which the agent may only read a Matter. No write tool is available.
+The mode in which the agent may only read a Matter. No write tool is available. Every new thread
+starts in Ask.
 _Avoid_: Project chat (LOIS's word), read-only mode, chat mode
 
 **Work**:
@@ -92,6 +93,11 @@ _Avoid_: Done card (LOIS's word), confirmation, receipt (alone)
 The list of every Write receipt in a thread, in order, so a reviewer can see everything the thread
 changed and where.
 _Avoid_: Audit log, history
+
+**Removal**:
+A Write that deletes a record this thread created earlier. It is proposed from the record's Write
+receipt and goes through its own Approval card.
+_Avoid_: Undo, rollback, revert
 
 **Author of record**:
 The Filevine user a Write is attributed to. Today that is the signed-in user; the body of every
@@ -131,4 +137,6 @@ Only Ask and Work are ever reachable in this fork.
 
 **Role**:
 Paralegal or Attorney. A Role decides the user's Mode ceiling per Org and nothing else in the UI.
+In the proof of concept a settings switch sets it; in a deployment it would come from Filevine's
+identity claims.
 _Avoid_: Permission level, tier
