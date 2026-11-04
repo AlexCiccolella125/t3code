@@ -33,8 +33,14 @@ _Avoid_: Live org, real org
 The DTL Sandbox Org, where test Matters live and writes are harmless.
 
 **Matter selection**:
-The set of Matters attached to a thread, from one up to six.
+The set of Matters attached to a thread, from one up to six. Every Write names one Matter from
+this set.
 _Avoid_: Context, scope, project selection
+
+**Starred Matter**:
+A Matter the user has marked to keep at hand. Starred Matters are the only ones the Picker shows
+before the user types.
+_Avoid_: Favourite, pinned, recent
 
 **Picker**:
 The dialog where a user searches Matters by name or Filevine project ID and builds the Matter
@@ -42,8 +48,14 @@ selection.
 _Avoid_: Project search, selector
 
 **Matter chip**:
-The tag above the composer naming one selected Matter and its Org.
+The tag above the composer naming one selected Matter and its Org. Each Matter in the selection
+has its own chip; chips are never collapsed into a count.
 _Avoid_: Project chip, pill, badge
+
+**Org badge**:
+The Production or Sandbox label shown wherever a Matter is named: chip, Picker row, Approval card,
+Write receipt.
+_Avoid_: Environment tag, warning label
 
 ### Working
 
@@ -62,8 +74,24 @@ waits for the user's approval.
 _Avoid_: Deep mode, agent mode, full access
 
 **Write**:
-One change the agent makes to one Matter, such as creating a note or a task.
+One change the agent proposes to one Matter, such as creating a note or a task. A Write moves
+through these states: proposed, approved, rejected, sent, confirmed, failed.
 _Avoid_: Action, tool call, mutation
+
+**Approval card**:
+The card shown for one proposed Write before it happens: the Matter, its Org badge, the record
+type and the full body, with Approve, Edit and Reject. One card per Write, never one per turn.
+_Avoid_: Confirmation, clarification (LOIS's word), batch approval
+
+**Write receipt**:
+The record shown under an Approval card once the Write was sent: Matter, Org badge, record type,
+a link to the record itself in Filevine, the time Filevine confirmed it, and its state.
+_Avoid_: Done card (LOIS's word), confirmation, receipt (alone)
+
+**Write ledger**:
+The list of every Write receipt in a thread, in order, so a reviewer can see everything the thread
+changed and where.
+_Avoid_: Audit log, history
 
 **Author of record**:
 The Filevine user a Write is attributed to. Today that is the signed-in user; the body of every
@@ -97,5 +125,10 @@ The whole firm's Filevine account, containing every Org.
 _Avoid_: Account, instance
 
 **Mode ceiling**:
-The broadest mode a policy allows a thread to run in. This fork sets the ceiling so that only Ask
-and Work are reachable.
+The broadest mode a policy allows a thread to run in. The ceiling can differ per Org: a paralegal's
+ceiling is Ask on a Production Org and Work on the Sandbox Org; an attorney's is Work everywhere.
+Only Ask and Work are ever reachable in this fork.
+
+**Role**:
+Paralegal or Attorney. A Role decides the user's Mode ceiling per Org and nothing else in the UI.
+_Avoid_: Permission level, tier
