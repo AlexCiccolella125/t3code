@@ -79,6 +79,7 @@ import {
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
 import { openMatterPicker } from "./matter/ComposerMatterBar";
+import { useMatterPageCommandItem } from "./matter/MatterPageCommandItem";
 import {
   useDeferredValue,
   useEffect,
@@ -503,6 +504,7 @@ function OpenCommandPaletteDialog(props: {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const providersByEnvironment = useEnvironmentProviders();
   const { changeThemeItem, changeAppearanceItem, themeEditorItem } = useCommandPaletteThemeItems();
+  const matterPageItem = useMatterPageCommandItem();
   const currentView = viewStack.at(-1)?.view ?? null;
   const threadSearchQuery = currentView === null && !isActionsOnly ? deferredQuery : "";
   const [browseGeneration, setBrowseGeneration] = useState(0);
@@ -1322,6 +1324,8 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  if (matterPageItem !== null) actionItems.push(matterPageItem);
 
   const promptLinkTarget = paletteRouteTarget
     ? paletteRouteTarget.kind === "server"

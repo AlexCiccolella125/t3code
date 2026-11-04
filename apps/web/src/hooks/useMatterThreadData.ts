@@ -128,3 +128,19 @@ export function useMatterThreadData(ref: ScopedThreadRef | null | undefined): Ma
     ref ? matterThreadDataFamily(scopedThreadKey(ref)) : EMPTY_MATTER_THREAD_DATA_ATOM,
   );
 }
+
+const EMPTY_MATTER_THREAD_DATA_LIST: ReadonlyArray<MatterThreadData> = [];
+const matterThreadDataListFamily = Atom.family((joinedKeys: string) =>
+  Atom.make((get): ReadonlyArray<MatterThreadData> =>
+    joinedKeys === ""
+      ? EMPTY_MATTER_THREAD_DATA_LIST
+      : joinedKeys.split("\n").map((key) => get(matterThreadDataFamily(key))),
+  ).pipe(Atom.withLabel(`matter-thread-data-list:${joinedKeys}`)),
+);
+
+/** useMatterThreadData for several threads at once, in the order given. */
+export function useMatterThreadDataList(
+  refs: ReadonlyArray<ScopedThreadRef>,
+): ReadonlyArray<MatterThreadData> {
+  return useAtomValue(matterThreadDataListFamily(refs.map(scopedThreadKey).join("\n")));
+}

@@ -1,12 +1,13 @@
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { ExternalLinkIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { useMatterThreadData } from "../../hooks/useMatterThreadData";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { FILEVINE_WRITE_KIND_LABEL } from "./FilevineApprovalCard";
 import { MatterOrgBadge } from "./MatterOrgBadge";
-import type { MatterLedgerStatus } from "./matterThreadData";
+import type { MatterLedgerRow, MatterLedgerStatus } from "./matterThreadData";
 
 const LEDGER_STATUS_BADGE = {
   proposed: { label: "Proposed", variant: "warning" },
@@ -33,6 +34,66 @@ function ledgerTime(value: string): string {
     : date.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
 }
 
+/** One Write: its subject, state, record link, kind and Matter, plus any caller detail. */
+export function MatterLedgerEntry({
+  row,
+  children,
+}: {
+  row: MatterLedgerRow;
+  children?: ReactNode;
+}) {
+  const status = LEDGER_STATUS_BADGE[row.status];
+  return (
+    <li
+      data-ledger-status={row.status}
+      className="flex flex-col gap-1 rounded-md border border-border bg-card px-3 py-2"
+    >
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <span className="min-w-0 text-sm font-medium wrap-anywhere">
+          {row.subject ?? FILEVINE_WRITE_KIND_LABEL[row.kind]}
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <Badge variant={status.variant} size="sm">
+            {status.label}
+          </Badge>
+          {row.recordUrl ? (
+            <a
+              href={row.recordUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${row.subject ?? "record"} in Filevine`}
+              className="inline-flex items-center text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLinkIcon aria-hidden className="size-3.5" />
+            </a>
+          ) : null}
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span className="tabular-nums">{ledgerTime(row.at)}</span>
+        <span aria-hidden>·</span>
+        <span>{FILEVINE_WRITE_KIND_LABEL[row.kind]}</span>
+        <span aria-hidden>·</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="max-w-48 truncate">{row.matter.name}</span>
+          <MatterOrgBadge matter={row.matter} />
+        </span>
+      </div>
+      {row.error ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="text-xs text-destructive" />}>
+            {shortError(row.error)}
+          </TooltipTrigger>
+          <TooltipPopup side="top" className="max-w-96 whitespace-pre-wrap">
+            {row.error}
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
+      {children}
+    </li>
+  );
+}
+
 /** The Write ledger: every Write this thread proposed or made, in order. */
 export function MatterWriteLedgerPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const { ledger } = useMatterThreadData(threadRef);
@@ -46,58 +107,9 @@ export function MatterWriteLedgerPanel({ threadRef }: { threadRef: ScopedThreadR
   return (
     <div className="h-full min-h-0 overflow-auto p-3">
       <ol aria-label="Write ledger" className="flex flex-col gap-2">
-        {ledger.map((row) => {
-          const status = LEDGER_STATUS_BADGE[row.status];
-          return (
-            <li
-              key={row.id}
-              data-ledger-status={row.status}
-              className="flex flex-col gap-1 rounded-md border border-border bg-card px-3 py-2"
-            >
-              <div className="flex min-w-0 items-start justify-between gap-2">
-                <span className="min-w-0 text-sm font-medium wrap-anywhere">
-                  {row.subject ?? FILEVINE_WRITE_KIND_LABEL[row.kind]}
-                </span>
-                <span className="flex shrink-0 items-center gap-1.5">
-                  <Badge variant={status.variant} size="sm">
-                    {status.label}
-                  </Badge>
-                  {row.recordUrl ? (
-                    <a
-                      href={row.recordUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open ${row.subject ?? "record"} in Filevine`}
-                      className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                    >
-                      <ExternalLinkIcon aria-hidden className="size-3.5" />
-                    </a>
-                  ) : null}
-                </span>
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span className="tabular-nums">{ledgerTime(row.at)}</span>
-                <span aria-hidden>·</span>
-                <span>{FILEVINE_WRITE_KIND_LABEL[row.kind]}</span>
-                <span aria-hidden>·</span>
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="max-w-48 truncate">{row.matter.name}</span>
-                  <MatterOrgBadge matter={row.matter} />
-                </span>
-              </div>
-              {row.error ? (
-                <Tooltip>
-                  <TooltipTrigger render={<span className="text-xs text-destructive" />}>
-                    {shortError(row.error)}
-                  </TooltipTrigger>
-                  <TooltipPopup side="top" className="max-w-96 whitespace-pre-wrap">
-                    {row.error}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : null}
-            </li>
-          );
-        })}
+        {ledger.map((row) => (
+          <MatterLedgerEntry key={row.id} row={row} />
+        ))}
       </ol>
     </div>
   );

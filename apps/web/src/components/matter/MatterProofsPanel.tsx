@@ -18,20 +18,20 @@ import { MATTER_EYEBROW_CLASS_NAME } from "./FilevineApprovalCard";
 import { MatterOrgBadge } from "./MatterOrgBadge";
 import type { MatterProofEntry } from "./matterThreadData";
 
-const PROOF_KIND_ICON = {
+export const PROOF_KIND_ICON = {
   note: NotebookPenIcon,
   section: TableOfContentsIcon,
   task: ListChecksIcon,
   document: FileTextIcon,
 } satisfies Record<FilevineProofKind, LucideIcon>;
 
-function proofByline(entry: MatterProofEntry): string | null {
+export function proofByline(entry: MatterProofEntry): string | null {
   const { author, createdAt } = entry.proof;
   const date = createdAt ? createdAt.slice(0, 10) : undefined;
   return [author, date].filter(Boolean).join(" · ") || null;
 }
 
-function OpenInFilevine({ url }: { url: string | undefined }) {
+export function OpenInFilevine({ url }: { url: string | undefined }) {
   if (url === undefined) return null;
   return (
     <Button

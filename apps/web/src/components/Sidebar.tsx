@@ -270,6 +270,7 @@ import {
   sidebarFolderRowId,
 } from "./sidebar/SidebarProjectFolderHeader";
 import { SidebarMatterGroupHeader } from "./matter/SidebarMatterGroupHeader";
+import { SidebarMattersSection } from "./matter/SidebarMattersSection";
 import {
   SidebarDragBoundary,
   SidebarSectionHeader,
@@ -3231,6 +3232,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           </SidebarGroup>
         }
       >
+        {isSearchingThreads ? null : <SidebarMattersSection />}
         <SidebarGroup className="flex-1" role="presentation">
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
