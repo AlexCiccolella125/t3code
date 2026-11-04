@@ -839,6 +839,7 @@ export function applyToProjection(
     case "thread.pin-reordered":
     case "thread.metadata-updated":
     case "thread.runtime-mode-updated":
+    case "thread.matter-updated":
     case "thread.interaction-mode-updated":
     case "thread.model-selection-updated":
     case "thread.provider-switched":
@@ -1600,6 +1601,12 @@ export function threadShellFromProjection(
     modelSelection: projection.thread.modelSelection,
     runtimeMode: projection.thread.runtimeMode,
     interactionMode: projection.thread.interactionMode,
+    ...(projection.thread.matterSelection === undefined
+      ? {}
+      : { matterSelection: projection.thread.matterSelection }),
+    ...(projection.thread.matterMode === undefined
+      ? {}
+      : { matterMode: projection.thread.matterMode }),
     branch: projection.thread.branch,
     worktreePath: projection.thread.worktreePath,
     pullRequests: threadPullRequestsOf(projection.thread),
@@ -1881,6 +1888,12 @@ function shellFromState(input: {
     modelSelection: input.state.thread.modelSelection,
     runtimeMode: input.state.thread.runtimeMode,
     interactionMode: input.state.thread.interactionMode,
+    ...(input.state.thread.matterSelection === undefined
+      ? {}
+      : { matterSelection: input.state.thread.matterSelection }),
+    ...(input.state.thread.matterMode === undefined
+      ? {}
+      : { matterMode: input.state.thread.matterMode }),
     branch: input.state.thread.branch,
     worktreePath: input.state.thread.worktreePath,
     pullRequests: threadPullRequestsOf(input.state.thread),
@@ -2007,6 +2020,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             case "thread.metadata-updated":
             case "thread.pull-request-synced":
             case "thread.runtime-mode-updated":
+            case "thread.matter-updated":
             case "thread.interaction-mode-updated":
             case "thread.model-selection-updated":
             case "thread.provider-switched":
@@ -2822,6 +2836,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             event.type !== "thread.pull-request-synced" &&
             event.type !== "thread.pull-request-link-updated" &&
             event.type !== "thread.runtime-mode-updated" &&
+            event.type !== "thread.matter-updated" &&
             event.type !== "thread.interaction-mode-updated" &&
             event.type !== "thread.model-selection-updated" &&
             event.type !== "thread.provider-switched" &&

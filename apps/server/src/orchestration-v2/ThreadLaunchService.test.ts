@@ -1491,6 +1491,29 @@ it.effect.each(["failed", "interrupted"] as const)(
   },
 );
 
+it.effect("lands the launch's Matter selection on the created thread", () => {
+  const harness = makeHarness();
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const matterSelection = [
+      {
+        matterId: "1001",
+        name: "Doe v. Acme",
+        orgId: 7,
+        orgName: "DTL Sandbox",
+        isProduction: false,
+      },
+    ];
+    const result = yield* launches.launch({
+      ...launchInput({ command: "command:matter", thread: "thread:matter" }),
+      matterSelection,
+      matterMode: "work",
+    });
+    assert.deepEqual(result.projection.thread.matterSelection, matterSelection);
+    assert.equal(result.projection.thread.matterMode, "work");
+  }).pipe(Effect.provide(harness.layer));
+});
+
 it.effect("replays a server-allocated launch", () =>
   Effect.gen(function* () {
     const setupEntered = yield* Deferred.make<void>();

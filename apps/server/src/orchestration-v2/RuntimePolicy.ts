@@ -1,6 +1,10 @@
 import {
   isRuntimeModeAbove,
   managedRuntimeModeCeilingMessage,
+  matterModeAllowed,
+  MatterMode,
+  MatterRole,
+  MatterSelection,
   ModelSelection,
   OrchestrationV2AppThread,
   ProjectId,
@@ -149,7 +153,8 @@ export const layerFromProjectStore: Layer.Layer<
     const projects = yield* ProjectStore.ProjectStoreV2;
     const providerInstances = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
     // The same ceiling the orchestrator enforces, fixed for the server's life.
-    const { managedPolicy } = yield* ServerSettings.ServerSettingsService;
+    const serverSettings = yield* ServerSettings.ServerSettingsService;
+    const { managedPolicy } = serverSettings;
     const maxRuntimeMode = managedPolicy?.limits?.maxRuntimeMode;
     return RuntimePolicyV2.of({
       resolve: Effect.fn("RuntimePolicyV2.resolve")(function* (input) {
@@ -184,16 +189,48 @@ export const layerFromProjectStore: Layer.Layer<
               }),
             ),
           ));
+        const matter =
+          input.thread.matterSelection === undefined
+            ? undefined
+            : yield* resolveMatterPolicy({
+                selection: input.thread.matterSelection,
+                mode: input.thread.matterMode ?? "ask",
+                role: (yield* serverSettings.getSettings.pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new RuntimePolicyResolveError({
+                        projectId: input.thread.projectId,
+                        providerInstanceId: input.modelSelection.instanceId,
+                        cause,
+                      }),
+                  ),
+                )).matterRole,
+              });
         return ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: providerRuntimeMode(input.thread.runtimeMode, supportedRuntimeModes),
           interactionMode: input.thread.interactionMode,
           cwd,
           ...(maxRuntimeMode === undefined ? {} : { maxRuntimeMode }),
+          ...(matter === undefined ? {} : { matter }),
         });
       }),
     });
   }),
 );
+
+// A role below the mode's ceiling (paralegal, production Matter, Work) falls back to Ask.
+const resolveMatterPolicy = Effect.fn("RuntimePolicyV2.resolveMatterPolicy")(function* (input: {
+  readonly selection: MatterSelection;
+  readonly mode: MatterMode;
+  readonly role: MatterRole;
+}) {
+  if (matterModeAllowed(input.role, input.mode, input.selection)) return input;
+  yield* Effect.logWarning("Matter mode above the role's ceiling; running in Ask.", {
+    role: input.role,
+    mode: input.mode,
+  });
+  return { ...input, mode: "ask" as const };
+});
 
 export function layerWithOverride(
   override: RuntimePolicyV2Override,

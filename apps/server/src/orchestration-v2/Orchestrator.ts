@@ -576,6 +576,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.title.regeneration.complete":
     case "thread.project.adopt-folder":
     case "thread.runtime-mode.set":
+    case "thread.matter.set":
     case "thread.interaction-mode.set":
     case "thread.model-selection.set":
     case "provider-session.detach":
@@ -2832,6 +2833,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       modelSelection: command.modelSelection,
       runtimeMode: command.runtimeMode,
       interactionMode: command.interactionMode,
+      ...(command.matterSelection === undefined
+        ? {}
+        : { matterSelection: command.matterSelection }),
+      ...(command.matterMode === undefined ? {} : { matterMode: command.matterMode }),
       branch: command.branch,
       worktreePath: command.worktreePath,
       activeProviderThreadId: null,
@@ -3131,6 +3136,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           | "thread.pull-request.sync"
           | "thread.title.regeneration.complete"
           | "thread.runtime-mode.set"
+          | "thread.matter.set"
           | "thread.interaction-mode.set"
           | "thread.model-selection.set"
           | "provider.switch";
@@ -3405,6 +3411,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
     const needsProviderState =
       command.type === "thread.runtime-mode.set" ||
+      command.type === "thread.matter.set" ||
       command.type === "thread.model-selection.set" ||
       command.type === "provider.switch" ||
       command.type === "thread.archive" ||
@@ -3984,6 +3991,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             : thread;
         case "thread.runtime-mode.set":
           return { ...thread, runtimeMode: command.runtimeMode, updatedAt: now };
+        case "thread.matter.set":
+          return {
+            ...thread,
+            matterSelection: command.matterSelection ?? thread.matterSelection,
+            matterMode: command.matterMode,
+            updatedAt: now,
+          };
         case "thread.interaction-mode.set":
           return { ...thread, interactionMode: command.interactionMode, updatedAt: now };
         case "thread.model-selection.set":
@@ -4055,6 +4069,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return "thread.pull-request-synced" as const;
         case "thread.runtime-mode.set":
           return "thread.runtime-mode-updated" as const;
+        case "thread.matter.set":
+          return "thread.matter-updated" as const;
         case "thread.interaction-mode.set":
           return "thread.interaction-mode-updated" as const;
         case "thread.model-selection.set":
@@ -4194,13 +4210,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             command.worktreePath !== undefined &&
             command.worktreePath !== thread.worktreePath
           ? (providerContext?.providerSessions ?? []).map((session) => session.id)
-          : command.type === "thread.runtime-mode.set"
-            ? (providerContext?.providerSessions ?? [])
-                .filter(
-                  (session) => !session.capabilities.sessions.supportsRuntimeModeSwitchInSession,
-                )
-                .map((session) => session.id)
-            : (providerSwitchPlan?.releaseProviderSessionIds ?? []),
+          : command.type === "thread.matter.set"
+            ? (providerContext?.providerSessions ?? []).map((session) => session.id)
+            : command.type === "thread.runtime-mode.set"
+              ? (providerContext?.providerSessions ?? [])
+                  .filter(
+                    (session) => !session.capabilities.sessions.supportsRuntimeModeSwitchInSession,
+                  )
+                  .map((session) => session.id)
+              : (providerSwitchPlan?.releaseProviderSessionIds ?? []),
     );
     if (detachSessionIds.size > 0) {
       const liveSessions = (providerContext?.providerSessions ?? []).filter(
@@ -4234,7 +4252,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                         ? "Workspace changed."
                         : command.type === "thread.runtime-mode.set"
                           ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
+                          : command.type === "thread.matter.set"
+                            ? "Matter selection changed."
+                            : "Provider or model selection changed.",
               },
             });
             const pendingEffect = {
@@ -4253,7 +4273,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                         ? "Workspace changed."
                         : command.type === "thread.runtime-mode.set"
                           ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
+                          : command.type === "thread.matter.set"
+                            ? "Matter selection changed."
+                            : "Provider or model selection changed.",
                 // Terminal detaches revoke MCP credentials; reattachments need other detach reasons to preserve them.
                 ...(command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
               },
@@ -7812,6 +7834,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         }),
         runtimeMode: command.runtimeMode,
         interactionMode: command.interactionMode,
+        ...(parentProjection.thread.matterSelection === undefined
+          ? {}
+          : { matterSelection: parentProjection.thread.matterSelection }),
+        ...(parentProjection.thread.matterMode === undefined
+          ? {}
+          : { matterMode: parentProjection.thread.matterMode }),
         ...(command.workspaceStrategy === undefined ? {} : { branch: null, worktreePath: null }),
       };
       const task: OrchestrationV2Subagent = {
@@ -9066,18 +9094,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           cause: runtimeRequest.responseCapability.reason,
         });
       }
+      // A Filevine write accepts feedback with Approve: it is the body the user edited on the card.
+      const feedbackDecisionAllowed =
+        command.decision === "decline" ||
+        (command.decision === "accept" && runtimeRequest.kind === "filevine-write");
       if (
         command.feedback !== undefined &&
         (runtimeRequest.responseCapability.type !== "live" ||
           !runtimeRequest.responseCapability.supportsFeedback ||
           runtimeRequest.kind === "user_input" ||
-          command.decision !== "decline" ||
+          !feedbackDecisionAllowed ||
           !command.feedback.trim())
       ) {
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: "Feedback requires a live approval that supports it and a decline decision.",
+          cause:
+            "Feedback requires a live approval that supports it and a decline decision, or Approve on a Filevine write.",
         });
       }
       const providerSessionId =
@@ -9185,7 +9218,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       };
       const emitEvent = emit(events, command);
       const requestNode = context.node;
-      if (command.feedback !== undefined) {
+      if (command.feedback !== undefined && command.decision !== "accept") {
         const messageId = MessageId.make(`approval-feedback:${command.requestId}`);
         // Record the reply for every client without dispatching a prompt to the parent agent.
         yield* emitEvent({
@@ -13227,6 +13260,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.pull-request.sync":
       case "thread.title.regeneration.complete":
       case "thread.runtime-mode.set":
+      case "thread.matter.set":
       case "thread.interaction-mode.set":
       case "thread.model-selection.set":
       case "provider.switch":

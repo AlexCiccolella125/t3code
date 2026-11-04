@@ -5,6 +5,8 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   CommandId,
   type ChatAttachment,
+  type MatterMode,
+  type MatterSelection,
   type MessageId,
   type ModelSelection,
   type OrchestrationV2Actor,
@@ -87,6 +89,8 @@ export interface ThreadLaunchInput {
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
+  readonly matterSelection?: MatterSelection;
+  readonly matterMode?: MatterMode;
   readonly workspaceStrategy: ThreadLaunchWorkspaceStrategy;
   readonly initialMessage?: ThreadLaunchInitialMessage;
   readonly importedNativeThread?: {
@@ -939,6 +943,10 @@ const make = Effect.gen(function* () {
                 modelSelection: input.modelSelection,
                 runtimeMode: input.runtimeMode,
                 interactionMode: input.interactionMode,
+                ...(input.matterSelection === undefined
+                  ? {}
+                  : { matterSelection: input.matterSelection }),
+                ...(input.matterMode === undefined ? {} : { matterMode: input.matterMode }),
                 branch: initialBranch,
                 worktreePath: initialWorktreePath,
                 ...(input.importedNativeThread === undefined

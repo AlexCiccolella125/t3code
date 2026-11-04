@@ -1,5 +1,6 @@
 import type {
   EnvironmentId,
+  FilevineWriteProposal,
   ScopedThreadRef,
   ThreadId,
   OrchestrationV2ThreadProjection,
@@ -60,6 +61,7 @@ export interface ThreadPendingApproval {
   readonly options?: ReadonlyArray<ProviderApprovalOption>;
   readonly responseCapability: "live" | "not_resumable";
   readonly supportsFeedback?: boolean;
+  readonly filevineWrite?: FilevineWriteProposal;
 }
 
 export const FULL_ACCESS_OVERRIDE_QUESTION = "Why am I being asked this?";
@@ -273,6 +275,9 @@ export function derivePendingThreadRequests(
       ...(item?.type === "approval_request" && item.appName ? { appName: item.appName } : {}),
       ...(item?.type === "approval_request" && item.options !== undefined
         ? { options: item.options }
+        : {}),
+      ...(item?.type === "approval_request" && item.filevineWrite !== undefined
+        ? { filevineWrite: item.filevineWrite }
         : {}),
       responseCapability: responseCapability === "live" ? "live" : "not_resumable",
       ...(request.responseCapability.type === "live" && request.responseCapability.supportsFeedback

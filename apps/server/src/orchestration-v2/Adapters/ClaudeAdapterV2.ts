@@ -66,6 +66,8 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- the SDK takes a Node ChildProcess for the CLI.
 import * as NodeChildProcess from "node:child_process";
+import * as NodeOS from "node:os";
+import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 import { parseCliArgs } from "@t3tools/shared/cliArgs";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
@@ -83,7 +85,12 @@ import {
   ClaudeSettings,
   TrimmedNonEmptyString,
   defaultInstanceIdForDriver,
+  FILEVINE_MCP_SERVER_NAME,
+  FILEVINE_TOOL_PREFIX,
+  type FilevineWriteProposal,
   isCompactionCommandMessage,
+  isFilevineWriteToolName,
+  type MatterRef,
   type ModelSelection,
   type OrchestrationV2ConversationMessage,
   type OrchestrationV2ExecutionNode,
@@ -1542,6 +1549,7 @@ export function makeClaudeQueryOptions(input: {
   readonly supportedDialogKinds?: ClaudeQueryOptions["supportedDialogKinds"];
   readonly allowDangerouslySkipPermissions?: boolean;
   readonly appendSystemPromptFileText?: string;
+  readonly matterBriefing?: string;
   // Flag settings, because a user's settings.json env beats the process env in Claude Code.
   readonly toolSearchOverride?: "true";
 }): ClaudeAgentSdkQueryOptions {
@@ -1653,13 +1661,14 @@ export function makeClaudeQueryOptions(input: {
       preset: "claude_code" as const,
       append: [
         buildRuntimeInstructions({ harness: "Claude Code" }) +
-          (input.mcpServers === undefined
+          (input.mcpServers?.["t3-code"] === undefined
             ? ""
             : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
               CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
               (deviceInstructions
                 ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
                 : "")),
+        ...(input.matterBriefing === undefined ? [] : [input.matterBriefing]),
         ...launchAppendSystemPrompt,
       ].join("\n\n"),
     },
@@ -1803,6 +1812,142 @@ export function claudeMcpQueryOverrides(input: {
         },
         timeout: CLAUDE_T3_MCP_TOOL_TIMEOUT_MS,
       },
+    },
+  };
+}
+
+type ClaudeMatterPolicy = NonNullable<ProviderAdapter.ProviderAdapterV2RuntimePolicy["matter"]>;
+
+export const CLAUDE_FILEVINE_READ_TOOLS = [
+  `${FILEVINE_TOOL_PREFIX}filevine_list_matters`,
+  `${FILEVINE_TOOL_PREFIX}filevine_matter_overview`,
+  `${FILEVINE_TOOL_PREFIX}filevine_search_activity`,
+  `${FILEVINE_TOOL_PREFIX}filevine_search_documents`,
+] as const;
+
+const FILEVINE_MCP_SERVER_PATH = NodeURL.fileURLToPath(
+  new URL("../../../scripts/filevine-mcp/server.ts", import.meta.url),
+);
+const FILEVINE_MCP_INHERITED_ENV = ["PATH", "HOME", "FVCID", "FVCS", "FVPAT", "FVSANDBOXPAT"];
+
+export function claudeFilevineUsername(): string {
+  try {
+    return NodeOS.userInfo().username;
+  } catch {
+    return process.env.USER ?? "the signed-in user";
+  }
+}
+
+// Only the read tools are pre-approved; every write must reach canUseTool, which is the Approval card.
+export function claudeFilevineMcpOverrides(input: {
+  readonly matter: ClaudeMatterPolicy;
+  readonly threadId: ThreadId;
+  readonly username: string;
+  readonly executablePath: string;
+  readonly serverPath?: string;
+  readonly environment?: NodeJS.ProcessEnv;
+  readonly allowedTools?: ReadonlyArray<string>;
+  readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
+}): {
+  readonly allowedTools: ReadonlyArray<string>;
+  readonly mcpServers: ClaudeQueryOptions["mcpServers"];
+} {
+  const inherited: Record<string, string> = {};
+  for (const key of FILEVINE_MCP_INHERITED_ENV) {
+    const value = (input.environment ?? process.env)[key];
+    if (value !== undefined) inherited[key] = value;
+  }
+  return {
+    allowedTools: Array.from(
+      new Set([...(input.allowedTools ?? []), ...CLAUDE_FILEVINE_READ_TOOLS]),
+    ),
+    mcpServers: {
+      ...input.mcpServers,
+      [FILEVINE_MCP_SERVER_NAME]: {
+        type: "stdio",
+        command: input.executablePath,
+        args: ["--experimental-strip-types", input.serverPath ?? FILEVINE_MCP_SERVER_PATH],
+        env: {
+          ...inherited,
+          ELECTRON_RUN_AS_NODE: "1",
+          T3_FILEVINE_SELECTION: JSON.stringify(input.matter.selection),
+          T3_FILEVINE_MODE: input.matter.mode,
+          T3_FILEVINE_ROLE: input.matter.role,
+          T3_FILEVINE_THREAD_ID: input.threadId,
+          T3_FILEVINE_USER: input.username,
+          T3_FILEVINE_LIVE: "1",
+        },
+      },
+    },
+  };
+}
+
+export function claudeMatterBriefing(matter: ClaudeMatterPolicy): string {
+  const matters = matter.selection
+    .map(
+      (ref) =>
+        `- ${ref.matterId}: ${ref.name} (${ref.orgName}, ${ref.isProduction ? "PRODUCTION" : "SANDBOX"})`,
+    )
+    .join("\n");
+  const modeLine =
+    matter.mode === "work"
+      ? "Mode: Work. You may read these Matters and propose writes; every write goes through the user's approval before anything is sent."
+      : "Mode: Ask. Reads only. If asked to write to a Matter, say that this thread is in Ask mode and the user can switch it to Work.";
+  return [
+    "# Matter briefing",
+    `The user is a ${matter.role}.`,
+    modeLine,
+    `Matters in this thread's selection:\n${matters}`,
+    "Call filevine_list_matters first.",
+    "Cite facts as [[cite:<citeId>]] immediately after the sentence they support, using citeIds from tool results; never invent one.",
+    "Each write names exactly one matterId from the selection; propose one write per record; do not batch.",
+    "After a write, do not restate the body; summarise what was written and where in one sentence.",
+  ].join("\n");
+}
+
+export function claudeFilevineWriteAssistantMarker(input: {
+  readonly threadId: ThreadId;
+  readonly username: string;
+}): string {
+  return `[Assistant] Drafted in T3 Code thread ${input.threadId}; approved by ${input.username}.`;
+}
+
+export function claudeFilevineWriteProposal(input: {
+  readonly toolName: string;
+  readonly toolInput: Record<string, unknown>;
+  readonly selection: ReadonlyArray<MatterRef>;
+  readonly threadId: ThreadId;
+  readonly username: string;
+}): { readonly proposal: FilevineWriteProposal } | { readonly denied: string } {
+  const text = (key: string) => {
+    const value = input.toolInput[key];
+    return typeof value === "string" ? value : undefined;
+  };
+  const matterId = text("matterId");
+  const matter = input.selection.find((candidate) => candidate.matterId === matterId);
+  if (matter === undefined) {
+    return {
+      denied: `Matter ${matterId ?? "(none)"} is outside this thread's selection (${input.selection.map((candidate) => candidate.matterId).join(", ")}). Ask the user to add it before writing to it.`,
+    };
+  }
+  const kind =
+    input.toolName === `${FILEVINE_TOOL_PREFIX}filevine_create_note`
+      ? "note"
+      : input.toolName === `${FILEVINE_TOOL_PREFIX}filevine_create_task`
+        ? "task"
+        : "removal";
+  const subject = text("subject");
+  const dueDate = text("dueDate");
+  const targetRecordId = text("recordId");
+  return {
+    proposal: {
+      matter,
+      kind,
+      ...(subject === undefined ? {} : { subject }),
+      body: text("body") ?? "",
+      assistantMarker: claudeFilevineWriteAssistantMarker(input),
+      ...(dueDate === undefined ? {} : { dueDate }),
+      ...(targetRecordId === undefined ? {} : { targetRecordId }),
     },
   };
 }
@@ -3511,11 +3656,20 @@ export function permissionResultFromDecision(input: {
   readonly feedback?: string;
   /** Under an administrator's ceiling, T3 Code's mode is the only one; Claude cannot switch it. */
   readonly managedCeiling?: boolean;
+  readonly requestKind?: ProviderRequestKind;
 }): PermissionResult {
   if (input.decision === "accept" || input.decision === "acceptForSession") {
+    // On a Filevine write, feedback with Approve is the body the user edited on the card.
+    const editedBody =
+      input.requestKind === "filevine-write" &&
+      input.feedback !== undefined &&
+      input.feedback.trim() !== ""
+        ? input.feedback
+        : undefined;
     return {
       behavior: "allow",
-      updatedInput: input.toolInput,
+      updatedInput:
+        editedBody === undefined ? input.toolInput : { ...input.toolInput, body: editedBody },
       toolUseID: input.toolUseID,
       decisionClassification:
         input.decision === "acceptForSession" ? "user_permanent" : "user_temporary",
@@ -7298,7 +7452,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly appName?: string;
           readonly options?: ReadonlyArray<ProviderApprovalOption>;
           readonly presentation?: ReturnType<typeof claudeApprovalPresentation>;
-
+          readonly filevineWrite?: FilevineWriteProposal;
           readonly questions?: ReadonlyArray<OrchestrationV2UserInputQuestion>;
         }) {
           const createdAt = yield* DateTime.now;
@@ -7390,6 +7544,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
                   ...(input.appName === undefined ? {} : { appName: input.appName }),
                   ...(input.options === undefined ? {} : { options: input.options }),
+                  ...(input.filevineWrite === undefined
+                    ? {}
+                    : { filevineWrite: input.filevineWrite }),
                   ...input.presentation,
                 }
               : {
@@ -10026,7 +10183,26 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             } satisfies PermissionResult;
           }
 
-          if (!requiresClaudeApproval(context)) {
+          // A Filevine write always waits for its Approval card, whatever the runtime mode.
+          const filevineWrite =
+            isFilevineWriteToolName(toolName) && context.input.runtimePolicy.matter !== undefined
+              ? claudeFilevineWriteProposal({
+                  toolName,
+                  toolInput,
+                  selection: context.input.runtimePolicy.matter.selection,
+                  threadId: context.input.threadId,
+                  username: claudeFilevineUsername(),
+                })
+              : undefined;
+          if (filevineWrite !== undefined && "denied" in filevineWrite) {
+            return {
+              behavior: "deny",
+              message: filevineWrite.denied,
+              toolUseID: callbackOptions.toolUseID,
+            } satisfies PermissionResult;
+          }
+
+          if (filevineWrite === undefined && !requiresClaudeApproval(context)) {
             return {
               behavior: "allow",
               updatedInput: toolInput,
@@ -10055,7 +10231,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             } satisfies PermissionResult;
           }
 
-          const requestKind = providerRequestKindFromClaudeTool(toolName);
+          const requestKind =
+            filevineWrite === undefined
+              ? providerRequestKindFromClaudeTool(toolName)
+              : ("filevine-write" as const);
           // The user approves the command itself; Claude's title and description only summarize it.
           const command = inputRecordValue(nativeToolInput, "command");
           const prompt =
@@ -10075,6 +10254,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               prompt,
               callbackOptions,
             }),
+            ...(filevineWrite === undefined ? {} : { filevineWrite: filevineWrite.proposal }),
           });
           const decision = yield* Deferred.make<ClaudeApprovalResponse, never>();
           yield* Ref.update(pendingRuntimeRequests, (current) => {
@@ -10126,6 +10306,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...resolvedDecision,
             toolInput,
             toolUseID: callbackOptions.toolUseID,
+            requestKind,
             managedCeiling: context.input.runtimePolicy.maxRuntimeMode !== undefined,
             ...(callbackOptions.suggestions === undefined
               ? {}
@@ -10383,7 +10564,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         ) {
           const queryPolicy = yield* queryPolicyForTurn(turnInput);
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
-          const mcpOverrides = claudeMcpQueryOverrides({
+          const t3McpOverrides = claudeMcpQueryOverrides({
             mcpSession,
             readOnlySandbox:
               sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly",
@@ -10391,6 +10572,18 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
+          const matter = turnInput.runtimePolicy.matter;
+          const mcpOverrides =
+            matter === undefined
+              ? t3McpOverrides
+              : claudeFilevineMcpOverrides({
+                  matter,
+                  threadId: turnInput.threadId,
+                  username: claudeFilevineUsername(),
+                  executablePath: process.execPath,
+                  environment: adapterOptions.environment,
+                  ...t3McpOverrides,
+                });
           const queryPolicyKey = claudeEffectiveQueryPolicyKey(queryPolicy, mcpOverrides);
           const compiledSelection = compileClaudeModelSelection(turnInput.modelSelection);
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
@@ -10543,6 +10736,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             onElicitation,
             supportedDialogKinds: ["resume_return"],
             ...(appendSystemPromptFileText === undefined ? {} : { appendSystemPromptFileText }),
+            ...(matter === undefined ? {} : { matterBriefing: claudeMatterBriefing(matter) }),
             ...(toolSearchOverride === undefined ? {} : { toolSearchOverride }),
           });
           const resolvedTurnCwd = yield* fileSystem

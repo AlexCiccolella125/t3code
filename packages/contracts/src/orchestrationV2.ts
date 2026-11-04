@@ -2537,6 +2537,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
     fullAccessOverride: Schema.optional(ProviderApprovalFullAccessOverride),
     appName: Schema.optional(Schema.String),
     options: Schema.optional(Schema.Array(ProviderApprovalOption)),
+    filevineWrite: Schema.optional(FilevineWriteProposal),
   }),
   Schema.Struct({
     ...OrchestrationV2TurnItemJsonBaseFields,

@@ -32,9 +32,11 @@ function makeThread(input: {
   readonly now: DateTime.Utc;
   readonly worktreePath: string | null;
   readonly runtimeMode?: RuntimeMode;
+  readonly matter?: Pick<OrchestrationV2AppThread, "matterSelection" | "matterMode">;
 }): OrchestrationV2AppThread {
   const threadId = ThreadId.make("thread:runtime-policy");
   return {
+    ...input.matter,
     createdBy: "user",
     creationSource: "web",
     id: threadId,
@@ -135,6 +137,30 @@ it.layer(layerTest)("RuntimePolicyV2", (it) => {
       assert.equal(acpPermissionDisposition(auto, request), "ask");
       assert.equal(acpPermissionDisposition(yield* resolve("auto-accept-edits"), request), "ask");
       assert.equal(acpPermissionDisposition(yield* resolve("full-access"), request), "allow");
+    }),
+  );
+
+  it.effect("drops a paralegal's Work on a production Matter to Ask", () =>
+    Effect.gen(function* () {
+      const policy = yield* RuntimePolicy.RuntimePolicyV2;
+      const now = yield* DateTime.now;
+      const matter = (isProduction: boolean) => ({
+        matterSelection: [
+          { matterId: "1001", name: "Doe v. Acme", orgId: 7, orgName: "Org", isProduction },
+        ],
+        matterMode: "work" as const,
+      });
+      const resolve = (isProduction: boolean) =>
+        policy.resolve({
+          thread: makeThread({ now, worktreePath: "/work", matter: matter(isProduction) }),
+          modelSelection,
+        });
+      const production = yield* resolve(true);
+      assert.equal(production.matter?.mode, "ask");
+      assert.equal(production.matter?.role, "paralegal");
+      const sandbox = yield* resolve(false);
+      assert.equal(sandbox.matter?.mode, "work");
+      assert.deepEqual(sandbox.matter?.selection, matter(false).matterSelection);
     }),
   );
 

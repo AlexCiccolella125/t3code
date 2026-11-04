@@ -39,6 +39,7 @@ const COMMAND_FEATURES: {
   "thread.pull-request.watch": (command) =>
     use("thread.pull_request.watch", command.watching ? "on" : "off"),
   "thread.runtime-mode.set": (command) => use("thread.runtime_mode.set", command.runtimeMode),
+  "thread.matter.set": (command) => use("thread.matter.set", command.matterMode),
   "thread.interaction-mode.set": (command) =>
     use("thread.interaction_mode.set", command.interactionMode),
   "run.interrupt": () => ({ feature: "run.interrupt" }),

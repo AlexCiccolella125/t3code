@@ -2184,6 +2184,10 @@ export const layerWsRpc = (
                     modelSelection: input.modelSelection,
                     runtimeMode: input.runtimeMode,
                     interactionMode: input.interactionMode,
+                    ...(input.matterSelection === undefined
+                      ? {}
+                      : { matterSelection: input.matterSelection }),
+                    ...(input.matterMode === undefined ? {} : { matterMode: input.matterMode }),
                     workspaceStrategy: input.workspaceStrategy,
                     ...(input.initialMessage === undefined
                       ? {}

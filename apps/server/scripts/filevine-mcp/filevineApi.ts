@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalDate:off
 // Minimal Filevine v2 client for the proof of concept. Reads ~/.env itself so no credential
 // ever passes through T3 Code's process or its logs. Writes are hard-limited to one sandbox Matter.
 import * as NodeFS from "node:fs";

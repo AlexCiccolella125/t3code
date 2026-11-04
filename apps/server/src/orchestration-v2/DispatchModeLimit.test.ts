@@ -17,6 +17,7 @@ import { DispatchModeLimit } from "./DispatchModeLimit.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import type { MatterSelection } from "@t3tools/contracts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -305,6 +306,47 @@ it.layer(layerWithCeiling)("runtime mode ceiling", (it) => {
       yield* orchestrator.dispatch(sendMessage(threadId, "first"));
       assert.lengthOf((yield* orchestrator.getThreadRecords(threadId, ["runs"])).runs, 1);
       assert.equal((yield* projections.getThreadShell(threadId))?.title, "After");
+    }),
+  );
+
+  it.effect("records a Matter selection on the thread and its shell", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = ThreadId.make("thread:matter-set");
+      yield* createThread(threadId);
+      const matterSelection: MatterSelection = [
+        {
+          matterId: "1001",
+          name: "Doe v. Acme",
+          orgId: 7,
+          orgName: "DTL Sandbox",
+          isProduction: false,
+        },
+      ];
+      yield* orchestrator.dispatch({
+        type: "thread.matter.set",
+        commandId: CommandId.make("matter:set"),
+        threadId,
+        matterSelection,
+        matterMode: "work",
+      });
+      const { thread } = yield* orchestrator.getThreadRecords(threadId, []);
+      assert.deepEqual(thread.matterSelection, matterSelection);
+      assert.equal(thread.matterMode, "work");
+      const shell = yield* store.getThreadShell(threadId);
+      assert.deepEqual(shell?.matterSelection, matterSelection);
+      assert.equal(shell?.matterMode, "work");
+
+      yield* orchestrator.dispatch({
+        type: "thread.matter.set",
+        commandId: CommandId.make("matter:mode-only"),
+        threadId,
+        matterMode: "ask",
+      });
+      const lowered = yield* orchestrator.getThreadRecords(threadId, []);
+      assert.deepEqual(lowered.thread.matterSelection, matterSelection);
+      assert.equal(lowered.thread.matterMode, "ask");
     }),
   );
 

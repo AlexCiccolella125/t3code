@@ -569,6 +569,103 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     assert.notEqual(rotatedKey, initialKey);
   });
 
+  it("adds the Filevine server and pre-approves only its read tools", () => {
+    const threadId = ThreadId.make("thread-claude-filevine");
+    const selection = [
+      {
+        matterId: "1001",
+        name: "Doe v. Acme",
+        orgId: 7,
+        orgName: "DTL Sandbox",
+        isProduction: false,
+      },
+    ];
+    const overrides = ClaudeAdapterV2.claudeFilevineMcpOverrides({
+      matter: { selection, mode: "work", role: "attorney" },
+      threadId,
+      username: "alex",
+      executablePath: "/usr/bin/node",
+      serverPath: "/srv/filevine-mcp/server.ts",
+      environment: { PATH: "/usr/bin", FVPAT: "secret" },
+      ...ClaudeAdapterV2.claudeMcpQueryOverrides({
+        mcpSession: mcpSessionFor(threadId),
+        readOnlySandbox: false,
+      }),
+    });
+
+    assert.deepEqual(overrides.allowedTools, [
+      ClaudeAdapterV2.CLAUDE_T3_MCP_TOOL_WILDCARD,
+      ...ClaudeAdapterV2.CLAUDE_FILEVINE_READ_TOOLS,
+    ]);
+    assert.isFalse(
+      overrides.allowedTools.some(
+        (tool) => tool.includes("filevine_create") || tool.includes("filevine_remove"),
+      ),
+    );
+    assert.deepEqual(overrides.mcpServers, {
+      ...T3_MCP_SERVERS,
+      "t3-filevine": {
+        type: "stdio",
+        command: "/usr/bin/node",
+        args: ["--experimental-strip-types", "/srv/filevine-mcp/server.ts"],
+        env: {
+          PATH: "/usr/bin",
+          FVPAT: "secret",
+          ELECTRON_RUN_AS_NODE: "1",
+          T3_FILEVINE_SELECTION: JSON.stringify(selection),
+          T3_FILEVINE_MODE: "work",
+          T3_FILEVINE_ROLE: "attorney",
+          T3_FILEVINE_THREAD_ID: threadId,
+          T3_FILEVINE_USER: "alex",
+          T3_FILEVINE_LIVE: "1",
+        },
+      },
+    });
+  });
+
+  it("builds a Filevine write proposal only for a Matter in the selection", () => {
+    const threadId = ThreadId.make("thread-claude-filevine-write");
+    const selection = [
+      {
+        matterId: "1001",
+        name: "Doe v. Acme",
+        orgId: 7,
+        orgName: "DTL Sandbox",
+        isProduction: false,
+      },
+    ];
+    const proposal = ClaudeAdapterV2.claudeFilevineWriteProposal({
+      toolName: "mcp__t3-filevine__filevine_create_task",
+      toolInput: {
+        matterId: "1001",
+        subject: "Call client",
+        body: "Confirm deposition date.",
+        dueDate: "2026-11-10",
+      },
+      selection,
+      threadId,
+      username: "alex",
+    });
+    assert.deepEqual(proposal, {
+      proposal: {
+        matter: selection[0]!,
+        kind: "task",
+        subject: "Call client",
+        body: "Confirm deposition date.",
+        assistantMarker: `[Assistant] Drafted in T3 Code thread ${threadId}; approved by alex.`,
+        dueDate: "2026-11-10",
+      },
+    });
+    const outside = ClaudeAdapterV2.claudeFilevineWriteProposal({
+      toolName: "mcp__t3-filevine__filevine_create_note",
+      toolInput: { matterId: "9999", body: "x" },
+      selection,
+      threadId,
+      username: "alex",
+    });
+    assert.isTrue("denied" in outside && outside.denied.includes("9999"));
+  });
+
   it("matches the read-only allowlist to the orchestrator toolkit annotations", () => {
     const readOnlyToolNames = [
       ...Object.values(OrchestratorToolkit.tools),
@@ -803,6 +900,33 @@ describe("ClaudeAdapterV2 session permissions", () => {
     assert.equal(result.decisionClassification, "user_reject");
     assert.equal(result.message, "User declined tool execution.");
     assert.equal(result.interrupt, undefined);
+  });
+
+  it("applies Approve feedback on a Filevine write as the edited body", () => {
+    const toolInput = { matterId: "1001", subject: "Call client", body: "Draft body" };
+    const edited = ClaudeAdapterV2.permissionResultFromDecision({
+      toolName: "mcp__t3-filevine__filevine_create_note",
+      decision: "accept",
+      toolInput,
+      toolUseID: "filevine-note",
+      requestKind: "filevine-write",
+      feedback: "Edited body",
+    });
+    assert.equal(edited.behavior, "allow");
+    if (edited.behavior !== "allow") return;
+    assert.deepEqual(edited.updatedInput, { ...toolInput, body: "Edited body" });
+
+    const unchanged = ClaudeAdapterV2.permissionResultFromDecision({
+      toolName: "Bash",
+      decision: "accept",
+      toolInput: { command: "make" },
+      toolUseID: "build",
+      requestKind: "command",
+      feedback: "ignored",
+    });
+    assert.equal(unchanged.behavior, "allow");
+    if (unchanged.behavior !== "allow") return;
+    assert.deepEqual(unchanged.updatedInput, { command: "make" });
   });
 
   it("forces suggested permission updates to session scope", () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off globalDate:off
 // Stdio MCP server over the thread's Matter selection. Kept separate from T3 Code's own MCP
 // server so Claude's permission callback fires for every write (that is the Approval card).
 // Env: T3_FILEVINE_SELECTION (JSON MatterRef[]), T3_FILEVINE_MODE ask|work,
