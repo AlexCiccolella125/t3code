@@ -1006,6 +1006,33 @@ export function groupSidebarThreadsByMatter<
   return { matterGroups: [...groupByMatterId.values()], rest };
 }
 
+/** Threads whose Matter selection holds the active Matter; every thread when none is active. */
+export function filterSidebarThreadsByMatter<
+  TThread extends { readonly matterSelection?: ReadonlyArray<MatterRef> | undefined },
+>(threads: readonly TThread[], matterId: string | null): readonly TThread[] {
+  if (matterId === null) return threads;
+  return threads.filter((thread) =>
+    thread.matterSelection?.some((matter) => matter.matterId === matterId),
+  );
+}
+
+/** Unarchived threads per Matter; a multi-Matter thread counts once under each of its Matters. */
+export function countSidebarThreadsByMatter(
+  threads: ReadonlyArray<{
+    readonly archivedAt: string | null;
+    readonly matterSelection?: ReadonlyArray<MatterRef> | undefined;
+  }>,
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const thread of threads) {
+    if (thread.archivedAt !== null) continue;
+    for (const matter of thread.matterSelection ?? []) {
+      counts.set(matter.matterId, (counts.get(matter.matterId) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 export type SidebarV2TopStatusKind =
   | "approval"
   | "done"

@@ -8,7 +8,7 @@ import { FILEVINE_WRITE_KIND_LABEL } from "./FilevineApprovalCard";
 import { MatterOrgBadge } from "./MatterOrgBadge";
 import type { MatterLedgerStatus } from "./matterThreadData";
 
-const LEDGER_STATUS_BADGE = {
+export const LEDGER_STATUS_BADGE = {
   proposed: { label: "Proposed", variant: "warning" },
   approved: { label: "Approved", variant: "info" },
   rejected: { label: "Rejected", variant: "secondary" },

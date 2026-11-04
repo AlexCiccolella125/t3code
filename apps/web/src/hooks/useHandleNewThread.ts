@@ -14,6 +14,11 @@ import {
   useComposerDraftStore,
 } from "../composerDraftStore";
 import { newDraftId, newThreadId } from "../lib/utils";
+import {
+  readActiveMatter,
+  seedDraftWithActiveMatter,
+  seedMatterSelection,
+} from "../components/matter/activeMatter";
 import { orderItemsByPreferredIds } from "../components/Sidebar.logic";
 import {
   deriveLogicalProjectKeyFromSettings,
@@ -75,7 +80,7 @@ export function createNewThreadHandler(router: AnyRouter) {
     return resolveThreadRouteTarget(currentRouteParams);
   };
 
-  return (
+  const openDraft = (
     projectRef: ScopedProjectRef,
     options?: {
       branch?: string | null;
@@ -406,8 +411,8 @@ export function createNewThreadHandler(router: AnyRouter) {
           }),
         runtimeMode: defaultRuntimeMode,
         ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
-        // Every new thread starts with no Matter and in Ask.
-        matterSelection: [],
+        // Every new thread starts in Ask, on the sidebar's active Matter if one is set.
+        matterSelection: seedMatterSelection([], readActiveMatter()) ?? [],
         matterMode: "ask",
       });
       applyStickyState(draftId);
@@ -423,6 +428,13 @@ export function createNewThreadHandler(router: AnyRouter) {
       });
       return { draftId, threadId };
     })();
+  };
+
+  // A reused empty draft keeps the selection it had; move it onto the active Matter.
+  return async (...args: Parameters<typeof openDraft>) => {
+    const opened = await openDraft(...args);
+    if (opened !== null) seedDraftWithActiveMatter(opened.draftId);
+    return opened;
   };
 }
 

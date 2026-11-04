@@ -180,6 +180,7 @@ import {
 import {
   applySidebarThreadDrop,
   filterSidebarV2VisibleThreads,
+  filterSidebarThreadsByMatter,
   groupSidebarThreadsByMatter,
   groupSidebarThreadsByProject,
   sidebarFolderExpansionKeys,
@@ -269,7 +270,9 @@ import {
   SidebarProjectFolderHeader,
   sidebarFolderRowId,
 } from "./sidebar/SidebarProjectFolderHeader";
+import { useActiveMatter } from "./matter/activeMatter";
 import { SidebarMatterGroupHeader } from "./matter/SidebarMatterGroupHeader";
+import { SidebarMattersSection } from "./matter/SidebarMattersSection";
 import {
   SidebarDragBoundary,
   SidebarSectionHeader,
@@ -1132,6 +1135,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
   const threads = useQuietThreadShells();
+  const [activeMatter, setActiveMatter] = useActiveMatter();
   const routeRowThreadKey =
     routeThreadRef === null
       ? null
@@ -1365,7 +1369,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
-    threads,
+    threads: filterSidebarThreadsByMatter(threads, activeMatter?.matterId ?? null),
     delegatedUnderParent,
     routeRowThreadKey,
     folderGroups: boringSidebarEnabled
@@ -3300,6 +3304,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 {threadSearch.isPending ? "Searching thread messages…" : "No threads found"}
               </p>
             )
+          ) : null}
+          {!isSearchingThreads ? (
+            <SidebarMattersSection
+              threads={threads}
+              activeMatter={activeMatter}
+              onActiveMatterChange={setActiveMatter}
+              routeThreadRef={routeThreadRef}
+              environmentId={primaryEnvironmentId}
+            />
           ) : null}
           {!isSearchingThreads ? (
             <TooltipProvider

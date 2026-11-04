@@ -8,6 +8,7 @@ import { render } from "../../../test/render";
 import { MatterHeaderSummary } from "./MatterHeaderSummary";
 import { MatterModeControl } from "./MatterModeControl";
 import { MatterPickerDialog } from "./MatterPickerDialog";
+import { seedMatterSelection } from "./activeMatter";
 import { STARRED_MATTERS_STORAGE_KEY } from "./starredMatters";
 
 const matter = (matterId: string) => MATTER_CATALOG.find((entry) => entry.matterId === matterId)!;
@@ -70,4 +71,13 @@ it("shows the first two Matters and +N once the header holds more than three", a
   await using screen = await render(<MatterHeaderSummary selection={selection} mode="ask" />);
   await expect.element(screen.getByText("+2")).toBeVisible();
   expect(screen.container.querySelectorAll("[data-matter-chip]")).toHaveLength(2);
+});
+
+it("seeds a new thread with the active Matter unless its selection already holds it", () => {
+  const active = matter("90000107");
+  const other = matter("90000101");
+  expect(seedMatterSelection([], null)).toBeNull();
+  expect(seedMatterSelection([], active)).toEqual([active]);
+  expect(seedMatterSelection([other], active)).toEqual([active]);
+  expect(seedMatterSelection([other, active], active)).toBeNull();
 });

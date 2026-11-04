@@ -33,6 +33,8 @@ import {
   type SidebarListMarker,
   type SidebarSection,
   resolveSidebarDropVerb,
+  countSidebarThreadsByMatter,
+  filterSidebarThreadsByMatter,
   groupSidebarThreadsByMatter,
   groupSidebarThreadsByProject,
   resolveSidebarFolderDot,
@@ -1590,6 +1592,34 @@ describe("groupSidebarThreadsByMatter", () => {
       ["90000107", ["sandbox"]],
     ]);
     expect(rest.map((thread) => thread.id)).toEqual(["plain", "cleared"]);
+  });
+
+  it("filters to threads holding the active Matter anywhere in their selection, and counts them", () => {
+    const sandbox = {
+      matterId: "90000107",
+      name: "Sample Matter 07",
+      orgId: 9234,
+      orgName: "DTL Sandbox",
+      isProduction: false,
+    };
+    const production = { ...sandbox, matterId: "90000101", isProduction: true };
+    const threads = [
+      { id: "plain", archivedAt: null },
+      { id: "multi", archivedAt: null, matterSelection: [production, sandbox] },
+      { id: "sandbox", archivedAt: null, matterSelection: [sandbox] },
+      { id: "archived", archivedAt: "2026-11-01T00:00:00.000Z", matterSelection: [sandbox] },
+    ];
+
+    expect(filterSidebarThreadsByMatter(threads, null)).toBe(threads);
+    expect(filterSidebarThreadsByMatter(threads, "90000107").map((thread) => thread.id)).toEqual([
+      "multi",
+      "sandbox",
+      "archived",
+    ]);
+    expect(Object.fromEntries(countSidebarThreadsByMatter(threads))).toEqual({
+      "90000101": 1,
+      "90000107": 2,
+    });
   });
 });
 
