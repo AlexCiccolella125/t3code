@@ -52,6 +52,7 @@ export const ProviderRequestKind = Schema.Literals([
   "file-change",
   "mcp-elicitation",
   "permission",
+  "filevine-write",
 ]);
 export type ProviderRequestKind = typeof ProviderRequestKind.Type;
 

@@ -3,6 +3,7 @@ import { withRecordIdTable } from "./orchestrationV2IdTable.ts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import { FilevineWriteProposal, MatterMode, MatterSelection } from "./matter.ts";
 import * as SchemaAST from "effect/SchemaAST";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaTransformation from "effect/SchemaTransformation";
@@ -450,6 +451,8 @@ export const OrchestrationV2AppThread = Schema.Struct({
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  matterSelection: Schema.optional(MatterSelection),
+  matterMode: Schema.optional(MatterMode),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
@@ -1697,6 +1700,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
     fullAccessOverride: Schema.optional(ProviderApprovalFullAccessOverride),
     appName: Schema.optional(Schema.String),
     options: Schema.optional(Schema.Array(ProviderApprovalOption)),
+    filevineWrite: Schema.optional(FilevineWriteProposal),
   }),
   Schema.Struct({
     ...OrchestrationV2TurnItemBaseFields,
@@ -1888,6 +1892,7 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.metadata-updated",
       "thread.pull-request-synced",
       "thread.runtime-mode-updated",
+      "thread.matter-updated",
       "thread.interaction-mode-updated",
       "thread.model-selection-updated",
       "thread.provider-switched",
@@ -2078,6 +2083,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  matterSelection: Schema.optional(MatterSelection),
+  matterMode: Schema.optional(MatterMode),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
@@ -2772,6 +2779,7 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
       "thread.pull-request-synced",
       "thread.metadata-updated",
       "thread.runtime-mode-updated",
+      "thread.matter-updated",
       "thread.interaction-mode-updated",
       "thread.model-selection-updated",
       "thread.provider-switched",
@@ -2914,6 +2922,8 @@ export const OrchestrationV2Command = Schema.Union([
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,
     interactionMode: ProviderInteractionMode,
+    matterSelection: Schema.optional(MatterSelection),
+    matterMode: Schema.optional(MatterMode),
     branch: Schema.NullOr(TrimmedNonEmptyString),
     worktreePath: Schema.NullOr(TrimmedNonEmptyString),
     /** Only the server sets this; a client's thread.create never carries one. */
@@ -3123,6 +3133,13 @@ export const OrchestrationV2Command = Schema.Union([
     commandId: CommandId,
     threadId: ThreadId,
     runtimeMode: RuntimeMode,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.matter.set"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    matterSelection: Schema.optional(MatterSelection),
+    matterMode: MatterMode,
   }),
   Schema.Struct({
     type: Schema.Literal("thread.interaction-mode.set"),
@@ -3640,6 +3657,8 @@ export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  matterSelection: Schema.optional(MatterSelection),
+  matterMode: Schema.optional(MatterMode),
   workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
   initialMessage: Schema.optional(
     Schema.Struct({
