@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { MatterDrawerButton } from "./MatterDrawerButton";
 import { MatterPickerDialog } from "./MatterPickerDialog";
 import { MatterSelectionBar } from "./MatterSelectionBar";
 import type { ThreadMatter } from "./useThreadMatter";
@@ -39,6 +40,7 @@ export function ComposerMatterBar({
         }
         onModeChange={matter.setMode}
         disabledReason={disabledReason}
+        trailing={matter.threadRef ? <MatterDrawerButton threadRef={matter.threadRef} /> : null}
       />
       <MatterPickerDialog
         open={pickerOpen && disabledReason === null}

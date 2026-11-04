@@ -22,12 +22,13 @@ const RIGHT_PANEL_KINDS = [
   "pull-request",
   "pull-requests",
   "side-chat",
-  "matter-proofs",
-  "matter-ledger",
+  "matter",
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
 export type PullRequestDetailTab = "summary" | "guide" | "timeline" | "code";
+
+export type MatterDrawerTab = "overview" | "proofs" | "ledger";
 
 export interface DeviceTabTarget {
   hostId: string;
@@ -79,8 +80,7 @@ export type RightPanelSurface =
     }
   | { id: "pull-requests"; kind: "pull-requests" }
   | { id: `side-chat:${string}`; kind: "side-chat"; threadId: ThreadId }
-  | { id: "matter-proofs"; kind: "matter-proofs"; citeId?: string }
-  | { id: "matter-ledger"; kind: "matter-ledger" };
+  | { id: "matter"; kind: "matter"; tab?: MatterDrawerTab; citeId?: string };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 const RIGHT_PANEL_STORAGE_VERSION = 14;
@@ -130,8 +130,10 @@ interface RightPanelStoreState {
     kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request" | "side-chat">,
   ) => void;
   openSideChat: (ref: ScopedThreadRef, threadId: ThreadId) => void;
-  /** Opens the Proofs panel with one Proof selected, or the list when `citeId` is null. */
+  /** Opens the Matter drawer on Proofs with one Proof selected, or the list when `citeId` is null. */
   openMatterProof: (ref: ScopedThreadRef, citeId: string | null) => void;
+  /** Automatic opens leave the user-action revision alone, like proactive panels. */
+  openMatterDrawer: (ref: ScopedThreadRef, tab: MatterDrawerTab, automatic?: boolean) => void;
   openDevice: (ref: ScopedThreadRef, target: DeviceTabTarget, automatic?: boolean) => void;
   renameDevice: (ref: ScopedThreadRef, surfaceId: string, title: string) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
@@ -225,10 +227,8 @@ const singletonSurface = (
       return { id: "pull-requests", kind };
     case "device":
       return { id: "device", kind };
-    case "matter-proofs":
-      return { id: "matter-proofs", kind };
-    case "matter-ledger":
-      return { id: "matter-ledger", kind };
+    case "matter":
+      return { id: "matter", kind };
   }
 };
 
@@ -315,6 +315,19 @@ const upsertSurface = (
     : [...current.surfaces, surface],
   activeSurfaceId: activate ? surface.id : current.activeSurfaceId,
 });
+
+/** Upserts and activates `surface`, swapping an open surface with the same id in place. */
+const replaceSurface = (
+  current: ThreadRightPanelState,
+  surface: RightPanelSurface,
+): ThreadRightPanelState =>
+  upsertSurface(
+    {
+      ...current,
+      surfaces: current.surfaces.map((entry) => (entry.id === surface.id ? surface : entry)),
+    },
+    surface,
+  );
 
 const updateThreadStateMap = (
   byThreadKey: Record<string, ThreadRightPanelState>,
@@ -499,7 +512,14 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
                     const kind = (surface as { kind?: string }).kind;
-                    if (kind === "plan" || kind === "agents") return [];
+                    if (
+                      kind === "plan" ||
+                      kind === "agents" ||
+                      kind === "matter-proofs" ||
+                      kind === "matter-ledger"
+                    ) {
+                      return [];
+                    }
                     if (
                       (surface.kind === "file" || surface.kind === "files") &&
                       "folderTrail" in surface &&
@@ -738,19 +758,24 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
         ),
       openMatterProof: (ref, citeId) =>
         set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) => {
-            const surface: RightPanelSurface =
-              citeId === null
-                ? { id: "matter-proofs", kind: "matter-proofs" }
-                : { id: "matter-proofs", kind: "matter-proofs", citeId };
-            return upsertSurface(
-              {
-                ...current,
-                surfaces: current.surfaces.map((entry) =>
-                  entry.id === surface.id ? surface : entry,
-                ),
-              },
-              surface,
+          userAction(state, scopedThreadKey(ref), (current) =>
+            replaceSurface(current, {
+              id: "matter",
+              kind: "matter",
+              tab: "proofs",
+              ...(citeId === null ? {} : { citeId }),
+            }),
+          ),
+        ),
+      openMatterDrawer: (ref, tab, automatic = false) =>
+        set((state) =>
+          (automatic ? automaticUpdate : userAction)(state, scopedThreadKey(ref), (current) => {
+            const existing = current.surfaces.find((entry) => entry.id === "matter");
+            return replaceSurface(
+              current,
+              existing?.kind === "matter"
+                ? { ...existing, tab }
+                : { id: "matter", kind: "matter", tab },
             );
           }),
         ),

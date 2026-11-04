@@ -4003,10 +4003,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddSideChat={sideChatsOffered ? openSideChatStable : undefined}
           {...(isServerThread && threadMatter.selection.length > 0
             ? {
-                onAddMatterProofs: () =>
-                  useRightPanelStore.getState().open(activeThreadRef, "matter-proofs"),
-                onAddMatterLedger: () =>
-                  useRightPanelStore.getState().open(activeThreadRef, "matter-ledger"),
+                onAddMatter: () => useRightPanelStore.getState().open(activeThreadRef, "matter"),
               }
             : {})}
           browserAvailable={canOperatePreview && browserAvailable}

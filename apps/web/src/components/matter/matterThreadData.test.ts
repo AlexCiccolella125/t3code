@@ -1,7 +1,7 @@
 import { RuntimeRequestId, type FilevineWriteProposal, type MatterRef } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { extractMatterThreadData } from "./matterThreadData";
+import { extractMatterThreadData, observeMatterWrites } from "./matterThreadData";
 
 const sandboxMatter: MatterRef = {
   matterId: "9001",
@@ -178,6 +178,12 @@ describe("extractMatterThreadData", () => {
       name: "Test Matter Beta",
       isProduction: true,
     });
+    expect(data.overviews.get("9002")).toEqual({
+      org: "Example Office (8)",
+      phase: undefined,
+      projectType: undefined,
+      office: undefined,
+    });
   });
 
   it("reads Write receipts and the tasks a Removal deleted", () => {
@@ -198,5 +204,58 @@ describe("extractMatterThreadData", () => {
       ["Removed task task-77", "confirmed"],
       ["Order records", "proposed"],
     ]);
+  });
+});
+
+describe("observeMatterWrites", () => {
+  const pendingData = extractMatterThreadData({
+    selection: [sandboxMatter],
+    toolResults: [],
+    writeRequests: [
+      {
+        requestId: RuntimeRequestId.make("request-1"),
+        nativeIds: ["tool-1"],
+        at: "2026-11-04T10:00:00.000Z",
+        proposal: proposal("Call adjuster"),
+        state: "pending",
+      },
+    ],
+  });
+  const receiptData = extractMatterThreadData({
+    selection: [sandboxMatter],
+    toolResults: [
+      {
+        itemId: "item-1",
+        toolName: "mcp__t3-filevine__filevine_create_task",
+        nativeId: "tool-1",
+        at: "2026-11-04T10:01:00.000Z",
+        output: blocks({
+          receipt: true,
+          matter: sandboxMatter,
+          kind: "task",
+          status: "confirmed",
+          subject: "Call adjuster",
+        }),
+      },
+    ],
+    writeRequests: [{ ...pendingData.proposals[0]!, state: "accepted" }],
+  });
+
+  it("opens for a new pending Write, then for the receipt that follows it", () => {
+    const first = observeMatterWrites(undefined, pendingData);
+    expect(first.open).toBe(true);
+    expect(observeMatterWrites(first.watch, pendingData).open).toBe(false);
+    expect(observeMatterWrites(first.watch, receiptData).open).toBe(true);
+  });
+
+  it("leaves a revisited thread's old receipts alone", () => {
+    const answered = extractMatterThreadData({
+      selection: [sandboxMatter],
+      toolResults: [],
+      writeRequests: receiptData.proposals,
+    });
+    const first = observeMatterWrites(undefined, answered);
+    expect(first.open).toBe(false);
+    expect(observeMatterWrites(first.watch, receiptData).open).toBe(false);
   });
 });

@@ -1,13 +1,14 @@
 import { MATTER_CATALOG } from "@t3tools/shared/matterCatalog";
 import type { MatterRef } from "@t3tools/contracts";
 import { useState } from "react";
-import { expect, it } from "vite-plus/test";
+import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
 import { MatterHeaderSummary } from "./MatterHeaderSummary";
 import { MatterModeControl } from "./MatterModeControl";
 import { MatterPickerDialog } from "./MatterPickerDialog";
+import { MatterSelectionBar } from "./MatterSelectionBar";
 import { STARRED_MATTERS_STORAGE_KEY } from "./starredMatters";
 
 const matter = (matterId: string) => MATTER_CATALOG.find((entry) => entry.matterId === matterId)!;
@@ -70,4 +71,28 @@ it("shows the first two Matters and +N once the header holds more than three", a
   await using screen = await render(<MatterHeaderSummary selection={selection} mode="ask" />);
   await expect.element(screen.getByText("+2")).toBeVisible();
   expect(screen.container.querySelectorAll("[data-matter-chip]")).toHaveLength(2);
+});
+
+it("collapses six composer chips across two Orgs to two and +4, listing the rest", async () => {
+  const selection = ["90000101", "90000104", "90000107", "90000102", "90000105", "90000108"].map(
+    matter,
+  );
+  const onRemove = vi.fn();
+  await using screen = await render(
+    <MatterSelectionBar
+      selection={selection}
+      mode="ask"
+      role="attorney"
+      onEdit={() => {}}
+      onRemove={onRemove}
+      onModeChange={() => {}}
+    />,
+  );
+  expect(screen.container.querySelectorAll("[data-matter-chip]")).toHaveLength(2);
+  await screen.getByRole("button", { name: "4 more matters" }).click();
+  const more = page.getByRole("list", { name: "More matters" });
+  await expect.element(more).toBeVisible();
+  expect(more.element().querySelectorAll("[data-matter-chip]")).toHaveLength(4);
+  await page.getByRole("button", { name: `Remove ${matter("90000108").name}` }).click();
+  expect(onRemove).toHaveBeenCalledWith(matter("90000108"));
 });

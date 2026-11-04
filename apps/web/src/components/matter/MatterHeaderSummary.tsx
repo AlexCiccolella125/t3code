@@ -5,8 +5,20 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MatterChip } from "./MatterChip";
 import { MatterOrgBadge } from "./MatterOrgBadge";
 
-const HEADER_VISIBLE_LIMIT = 3;
-const HEADER_VISIBLE_WHEN_OVERFLOWING = 2;
+const VISIBLE_LIMIT = 3;
+const VISIBLE_WHEN_OVERFLOWING = 2;
+
+/** Up to three Matters show in full; past that, the first two and a count of the rest. */
+export function splitMatterOverflow<T>(selection: ReadonlyArray<T>): {
+  visible: ReadonlyArray<T>;
+  hidden: ReadonlyArray<T>;
+} {
+  if (selection.length <= VISIBLE_LIMIT) return { visible: selection, hidden: [] };
+  return {
+    visible: selection.slice(0, VISIBLE_WHEN_OVERFLOWING),
+    hidden: selection.slice(VISIBLE_WHEN_OVERFLOWING),
+  };
+}
 
 /** Each Matter by name with its Org badge; past three, the first two and "+N" listing the rest. */
 export function MatterHeaderSummary({
@@ -17,11 +29,8 @@ export function MatterHeaderSummary({
   mode: MatterMode;
 }) {
   if (selection.length === 0) return null;
-  const visible =
-    selection.length > HEADER_VISIBLE_LIMIT
-      ? selection.slice(0, HEADER_VISIBLE_WHEN_OVERFLOWING)
-      : selection;
-  const hidden = selection.length - visible.length;
+  const { visible, hidden: hiddenMatters } = splitMatterOverflow(selection);
+  const hidden = hiddenMatters.length;
   return (
     <span
       data-matter-header-summary

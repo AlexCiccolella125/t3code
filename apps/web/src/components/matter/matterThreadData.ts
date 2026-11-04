@@ -37,6 +37,14 @@ export interface MatterHeading {
   readonly isProduction: boolean;
 }
 
+/** What a Filevine read said about a Matter beyond its name, for the drawer's Overview. */
+export interface MatterOverviewFacts {
+  readonly org: string | undefined;
+  readonly phase: string | undefined;
+  readonly projectType: string | undefined;
+  readonly office: string | undefined;
+}
+
 export interface MatterProofEntry {
   readonly index: number;
   readonly proof: FilevineProof;
@@ -65,6 +73,7 @@ export interface MatterThreadData {
   readonly proofs: ReadonlyArray<MatterProofEntry>;
   readonly proofsByCiteId: ReadonlyMap<string, MatterProofEntry>;
   readonly matters: ReadonlyMap<string, MatterHeading>;
+  readonly overviews: ReadonlyMap<string, MatterOverviewFacts>;
   readonly writes: ReadonlyArray<MatterWriteEntry>;
   readonly writesByItemId: ReadonlyMap<string, MatterWriteEntry>;
   readonly proposals: ReadonlyArray<MatterWriteRequest>;
@@ -77,6 +86,7 @@ export const EMPTY_MATTER_THREAD_DATA: MatterThreadData = {
   proofs: [],
   proofsByCiteId: new Map(),
   matters: new Map(),
+  overviews: new Map(),
   writes: [],
   writesByItemId: new Map(),
   proposals: [],
@@ -133,6 +143,31 @@ function matterHeading(value: unknown): MatterHeading | undefined {
       ? record.isProduction
       : record.environment === "PRODUCTION";
   return { matterId: record.matterId, name: record.name, isProduction };
+}
+
+const optionalString = (value: unknown) => (typeof value === "string" ? value : undefined);
+
+function overviewFacts(value: unknown): MatterOverviewFacts | undefined {
+  if (!Predicate.isObject(value)) return undefined;
+  const record = value as Payload;
+  const facts = {
+    org: optionalString(record.org) ?? optionalString(record.orgName),
+    phase: optionalString(record.phase),
+    projectType: optionalString(record.projectType),
+    office: optionalString(record.office),
+  };
+  return Object.values(facts).some((fact) => fact !== undefined) ? facts : undefined;
+}
+
+function payloadMatterRecords(payload: Payload): ReadonlyArray<unknown> {
+  return [
+    payload.matter,
+    ...(Array.isArray(payload.results)
+      ? payload.results.map((result) =>
+          Predicate.isObject(result) ? (result as Payload).matter : undefined,
+        )
+      : []),
+  ];
 }
 
 function payloadProofs(payload: Payload): Array<{ heading?: MatterHeading; proofs: unknown }> {
@@ -193,6 +228,7 @@ export function extractMatterThreadData(input: {
       isProduction: matter.isProduction,
     });
   }
+  const overviews = new Map<string, MatterOverviewFacts>();
   const proofs: MatterProofEntry[] = [];
   const proofsByCiteId = new Map<string, MatterProofEntry>();
   const writes: MatterWriteEntry[] = [];
@@ -210,6 +246,11 @@ export function extractMatterThreadData(input: {
       writesByItemId.set(result.itemId, entry);
       if (result.nativeId !== null) writeNativeIds.add(result.nativeId);
       continue;
+    }
+    for (const record of payloadMatterRecords(payload)) {
+      const heading = matterHeading(record);
+      const facts = overviewFacts(record);
+      if (heading !== undefined && facts !== undefined) overviews.set(heading.matterId, facts);
     }
     for (const group of payloadProofs(payload)) {
       if (group.heading !== undefined && !matters.has(group.heading.matterId)) {
@@ -278,6 +319,7 @@ export function extractMatterThreadData(input: {
     proofs,
     proofsByCiteId,
     matters,
+    overviews,
     writes,
     writesByItemId,
     proposals: input.writeRequests,
@@ -285,3 +327,39 @@ export function extractMatterThreadData(input: {
     removedRecordIds,
   };
 }
+
+/** What the composer last saw of a thread's Writes, to tell a new one from history. */
+export interface MatterWriteWatch {
+  readonly requestIds: ReadonlySet<string>;
+  readonly receiptIds: ReadonlySet<string>;
+  /** Set once a pending Write was seen; until then receipts are history still loading. */
+  readonly armed: boolean;
+}
+
+/**
+ * Opens the drawer on its Ledger for a new pending Write, or for a receipt landing after one.
+ * Revisiting a thread leaves the panel alone, since its receipts load after its requests.
+ */
+export function observeMatterWrites(
+  previous: MatterWriteWatch | undefined,
+  data: MatterThreadData,
+): { readonly watch: MatterWriteWatch; readonly open: boolean } {
+  const pending = data.proposals.flatMap((request) =>
+    request.state === "pending" ? [request.requestId as string] : [],
+  );
+  const receipts = data.writes.map((entry) => entry.itemId);
+  const newPending = pending.some((id) => !previous?.requestIds.has(id));
+  const newReceipt =
+    previous?.armed === true && receipts.some((id) => !previous.receiptIds.has(id));
+  return {
+    open: newPending || newReceipt,
+    watch: {
+      requestIds: new Set([...(previous?.requestIds ?? []), ...pending]),
+      receiptIds: new Set(receipts),
+      armed: previous?.armed === true || pending.length > 0,
+    },
+  };
+}
+
+export const pendingMatterWriteCount = (data: MatterThreadData) =>
+  data.proposals.filter((request) => request.state === "pending").length;

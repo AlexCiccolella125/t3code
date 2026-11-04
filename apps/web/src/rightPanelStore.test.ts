@@ -488,6 +488,28 @@ describe("rightPanelStore", () => {
     expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("diff");
   });
 
+  it("routes citations and Write arrivals to one Matter drawer", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "diff");
+    store.openMatterProof(refA, "9001:section:limits");
+    const revision = store.getUserActionRevision(refA);
+    store.openMatterDrawer(refA, "ledger", true);
+
+    const state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.surfaces.filter((surface) => surface.kind === "matter")).toEqual([
+      { id: "matter", kind: "matter", tab: "ledger", citeId: "9001:section:limits" },
+    ]);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("matter");
+    expect(store.getUserActionRevision(refA)).toBe(revision);
+
+    store.openMatterProof(refA, null);
+    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      id: "matter",
+      kind: "matter",
+      tab: "proofs",
+    });
+  });
+
   it("keeps a maximized panel per thread without counting it as a manual choice", () => {
     const store = useRightPanelStore.getState();
     store.open(refA, "preview");

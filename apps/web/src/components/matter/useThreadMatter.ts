@@ -1,3 +1,4 @@
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   DEFAULT_MATTER_MODE,
   matterModeAllowed,
@@ -5,6 +6,7 @@ import {
   type MatterMode,
   type MatterRef,
   type MatterRole,
+  type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
 
@@ -20,6 +22,8 @@ import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 const EMPTY_SELECTION: ReadonlyArray<MatterRef> = [];
 
 export interface ThreadMatter {
+  /** Null until the first send creates the thread; only a server thread has a Matter drawer. */
+  readonly threadRef: ScopedThreadRef | null;
   /** The thread's environment decides the role, since its server enforces the ceiling. */
   readonly role: MatterRole;
   readonly selection: ReadonlyArray<MatterRef>;
@@ -75,6 +79,8 @@ export function useThreadMatter(input: {
   };
 
   return {
+    threadRef:
+      input.serverThread === null ? null : scopeThreadRef(input.environmentId, input.threadId),
     role,
     selection,
     mode,

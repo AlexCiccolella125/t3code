@@ -3,7 +3,7 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useMatterThreadData } from "../../hooks/useMatterThreadData";
 import { useRightPanelStore } from "../../rightPanelStore";
 
-/** A Citation in an answer: its Proof's number and title; opens the Proof in the Proofs panel. */
+/** A Citation in an answer: its Proof's number and title; opens it on the Matter drawer's Proofs tab. */
 export function MatterCitationChip({
   citeId,
   threadRef,
