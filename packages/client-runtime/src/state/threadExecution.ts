@@ -299,7 +299,7 @@ export interface UsageLimitNoticeRows {
 
 // Claude Code's own limit messages, such as "You've hit your 5-hour limit · resets 7:10am".
 const PROVIDER_LIMIT_NOTICE =
-  /^(?:You[’']ve hit your (?:(?:5-hour|session|weekly|usage) )?limit|You[’']re out of extra usage|Claude AI usage limit reached)(?: · resets (?:[1-9]|1[0-2])(?::[0-5]\d)?(?:am|pm)(?: \([A-Za-z_+-]+(?:\/[A-Za-z_+-]+)+\))?)?\.?$/i;
+  /^(?:You[’']ve hit your (?:(?:5-hour|session|weekly|usage) )?limit|You[’']re out of extra usage|Claude AI usage limit reached)(?: · resets (?:[1-9]|1[0-2])(?::[0-5]\d)?(?:am|pm)(?: \([A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)*\))?)?\.?$/i;
 
 /**
  * The timeline rows that repeat a usage-limit pause while its recovery notice shows: the run's

@@ -646,6 +646,8 @@ describe("usage-limit notice rows", () => {
     for (const text of [
       "You've hit your session limit",
       "You've hit your session limit · resets 11:10am (Australia/Sydney)",
+      "You've hit your 5-hour limit · resets 7:10am (UTC)",
+      "You've hit your weekly limit · resets 9pm (Etc/GMT+5)",
       "You're out of extra usage",
       "Claude AI usage limit reached.",
     ]) {
