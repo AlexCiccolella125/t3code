@@ -1,4 +1,3 @@
-import { Button } from "../../components/ui/Button";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -158,27 +157,30 @@ export function UsageLimitRecoveryCard({
               <Text className="text-sm font-t3-medium text-primary">{action.label}</Text>
             </Pressable>
           </View>
-        ) : (
-          <Text className="text-sm text-warning-foreground">
-            {resetText
-              ? `Usage limit reached. ${resetText}`
-              : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
-          </Text>
-        )}
-        {canSchedule ? (
-          <View className="flex-row flex-wrap gap-2">
-            <Button
-              label={scheduled ? "Cancel auto-resume" : "Resume at reset"}
-              tone="secondary"
-              disabled={pending}
-              onPress={() => void toggle("resume")}
-            />
-            <Button
-              label={snoozed ? "Wake now" : "Snooze until reset"}
-              tone="secondary"
-              disabled={pending || (!snoozed && resetPassed)}
-              onPress={() => void toggle("snooze")}
-            />
+        ) : null}
+        {!chatGptLimit || canSchedule ? (
+          <View className="flex-row flex-wrap items-baseline gap-x-4 gap-y-2">
+            {chatGptLimit ? null : (
+              <Text className="shrink text-sm text-warning-foreground">
+                {resetText
+                  ? `Usage limit reached. ${resetText}`
+                  : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
+              </Text>
+            )}
+            {canSchedule ? (
+              <>
+                <RecoveryAction
+                  label={scheduled ? "Cancel auto-resume" : "Resume at reset"}
+                  disabled={pending}
+                  onPress={() => void toggle("resume")}
+                />
+                <RecoveryAction
+                  label={snoozed ? "Wake now" : "Snooze until reset"}
+                  disabled={pending || (!snoozed && resetPassed)}
+                  onPress={() => void toggle("snooze")}
+                />
+              </>
+            ) : null}
           </View>
         ) : null}
         {error ? (
@@ -188,5 +190,32 @@ export function UsageLimitRecoveryCard({
         ) : null}
       </View>
     </View>
+  );
+}
+
+function RecoveryAction(props: {
+  readonly label: string;
+  readonly disabled: boolean;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: props.disabled }}
+      disabled={props.disabled}
+      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+      onPress={props.onPress}
+      className="active:opacity-70"
+    >
+      <Text
+        className={
+          props.disabled
+            ? "text-sm font-t3-medium text-foreground-muted"
+            : "text-sm font-t3-medium text-primary"
+        }
+      >
+        {props.label}
+      </Text>
+    </Pressable>
   );
 }

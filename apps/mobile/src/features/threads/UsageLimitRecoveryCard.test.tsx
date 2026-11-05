@@ -10,11 +10,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-type ButtonProps = { label: string; disabled?: boolean; onPress: () => void };
+type PressableProps = { children: ReactNode; disabled?: boolean; onPress: () => void };
 
 vi.mock("react-native", () => ({
   Linking: { openURL: vi.fn() },
-  Pressable: ({ children, disabled, onPress }: ButtonProps & { children: ReactNode }) => (
+  Pressable: ({ children, disabled, onPress }: PressableProps) => (
     <button type="button" disabled={disabled} onClick={onPress}>
       {children}
     </button>
@@ -25,13 +25,6 @@ vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 vi.mock("../../components/ProviderIcon", () => ({ ProviderIcon: () => null }));
 vi.mock("../../components/ui/AppText", () => ({
   AppText: ({ children }: { children: ReactNode }) => <span>{children}</span>,
-}));
-vi.mock("../../components/ui/Button", () => ({
-  Button: ({ label, disabled, onPress }: ButtonProps) => (
-    <button type="button" disabled={disabled} onClick={onPress}>
-      {label}
-    </button>
-  ),
 }));
 vi.mock("../../state/threads", () => ({ threadEnvironment: { updateMetadata: {} } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
