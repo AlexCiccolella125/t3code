@@ -65,12 +65,13 @@ export function UsageLimitRecoveryCard({
         { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" },
       )}.`
     : null;
-  const snoozed = limitRecoveryOwnsSnooze({
-    runId,
-    resetAt,
-    recovery,
-    snoozedUntil: thread.snoozedUntil,
-  });
+  const snoozed =
+    limitRecoveryOwnsSnooze({
+      runId,
+      resetAt,
+      recovery,
+      snoozedUntil: thread.snoozedUntil,
+    }) && !resetPassed;
   async function toggle(action: "resume" | "snooze") {
     if (!resetAt || !runId || !canSchedule) return;
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
