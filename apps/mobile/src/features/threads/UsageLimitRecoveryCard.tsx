@@ -39,6 +39,14 @@ export function UsageLimitRecoveryCard({
   const recovery = thread.limitRecovery;
   const scheduled =
     recovery?.runId === runId && recovery?.resetAt === resetAt && recovery?.autoResume;
+  const displayAt =
+    canSchedule &&
+    scheduled &&
+    resetAt &&
+    thread.snoozedUntil &&
+    Date.parse(thread.snoozedUntil) > Date.parse(resetAt)
+      ? thread.snoozedUntil
+      : resetAt;
   const [copied, setCopied] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const code = thread.runtime?.lastErrorCode;
@@ -52,8 +60,8 @@ export function UsageLimitRecoveryCard({
     !runId
   )
     return null;
-  const resetText = resetAt
-    ? `${canSchedule && scheduled ? "Resumes" : "Resets"} ${new Date(resetAt).toLocaleString(
+  const resetText = displayAt
+    ? `${canSchedule && scheduled ? "Resumes" : "Resets"} ${new Date(displayAt).toLocaleString(
         undefined,
         { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" },
       )}.`
