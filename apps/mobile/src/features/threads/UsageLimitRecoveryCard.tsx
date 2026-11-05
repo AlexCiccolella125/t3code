@@ -134,40 +134,38 @@ export function UsageLimitRecoveryCard({
           <ProviderIcon provider="codex" size={16} />
         </View>
       ) : null}
-      <View className="min-w-0 flex-1 gap-2">
+      <View className="min-w-0 flex-1 gap-1">
         {chatGptLimit ? (
-          <View className="gap-1">
-            <Text className="text-sm font-t3-medium text-foreground">
-              ChatGPT usage limit reached
-            </Text>
-            <Text className="text-sm text-foreground-muted">
-              {workspaceLimit
-                ? copied
-                  ? "Request copied. Send it to your workspace admin."
-                  : "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
-                : (resetText ?? "Review your usage settings in ChatGPT.")}
-            </Text>
-            <Pressable
-              accessibilityRole={action.role}
-              accessibilityState={{ disabled: actionPending }}
-              disabled={actionPending}
-              hitSlop={14}
-              className="mt-1 self-start active:opacity-70"
-              onPress={action.run}
-            >
-              <Text className="text-sm font-t3-medium text-primary">{action.label}</Text>
-            </Pressable>
-          </View>
+          <Text className="text-sm font-t3-medium text-foreground">
+            ChatGPT usage limit reached
+          </Text>
         ) : null}
-        {!chatGptLimit || canSchedule ? (
-          <View className="flex-row flex-wrap items-baseline gap-x-4 gap-y-2">
-            {chatGptLimit ? null : (
-              <Text className="shrink text-sm text-warning-foreground">
-                {resetText
-                  ? `Usage limit reached. ${resetText}`
-                  : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
-              </Text>
-            )}
+        <Text
+          className={
+            chatGptLimit ? "text-sm text-foreground-muted" : "text-sm text-warning-foreground"
+          }
+        >
+          {workspaceLimit
+            ? copied
+              ? "Request copied. Send it to your workspace admin."
+              : "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
+            : chatGptLimit
+              ? (resetText ?? "Review your usage settings in ChatGPT.")
+              : resetText
+                ? `Usage limit reached. ${resetText}`
+                : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
+        </Text>
+        {chatGptLimit || canSchedule ? (
+          // The margins cancel the 44pt touch height so the links sit 8pt under the text.
+          <View className="-mb-3 -mt-2 flex-row flex-wrap gap-x-4">
+            {chatGptLimit ? (
+              <RecoveryAction
+                label={action.label}
+                role={action.role}
+                disabled={actionPending}
+                onPress={action.run}
+              />
+            ) : null}
             {canSchedule ? (
               <>
                 <RecoveryAction
@@ -196,12 +194,13 @@ export function UsageLimitRecoveryCard({
 
 function RecoveryAction(props: {
   readonly label: string;
+  readonly role?: "button" | "link";
   readonly disabled: boolean;
   readonly onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={props.role ?? "button"}
       accessibilityState={{ disabled: props.disabled }}
       disabled={props.disabled}
       hitSlop={{ left: 8, right: 8 }}
